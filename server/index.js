@@ -12,9 +12,28 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-connectDB();
+const allowedOrigins = process.env.CLIENT_URL ? [process.env.CLIENT_URL] : [];
 
-app.use(cors({ origin: process.env.CLIENT_URL || '*' }));
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Allow requests with no origin (e.g., mobile apps, curl, server-to-server)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.length === 0 && process.env.NODE_ENV === 'development') {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Not allowed by CORS'));
+    },
+  })
+);
 app.use(express.json());
 app.use(morgan('dev'));
 
@@ -27,10 +46,21 @@ app.use('/api/playlists', playlistRoutes);
 app.use('/api/likes', likeRoutes);
 
 app.use((err, _req, res, _next) => {
-  console.error(err);
-  res.status(err.status || 500).json({ message: err.message || 'Server error' });
+  const status = err.status || err.statusCode || 500;
+  console.error('Error handler:', { message: err.message, status, code: err.code, name: err.name });
+  res.status(status).json({ message: err.message || 'Server error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+const start = async () => {
+  try {
+    await connectDB();
+  } catch (error) {
+    console.warn('Starting server without database connection. DB-backed routes will be unavailable.', error.message);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+};
+
+start();

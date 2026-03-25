@@ -15,6 +15,7 @@ export default function App() {
     const load = async () => {
       try {
         const data = await fetchRecommendations();
+        setError('');
         setAlbums(data);
       } catch {
         setError('Unable to load recommendations. Check backend and Spotify credentials.');
@@ -26,6 +27,7 @@ export default function App() {
 
   const handleSearch = async () => {
     if (!query.trim()) return;
+    setError('');
     try {
       const data = await searchMusic(query.trim());
       setResults(data);
