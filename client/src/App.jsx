@@ -13,6 +13,7 @@ export default function App() {
 
   useEffect(() => {
     const load = async () => {
+      setError('');
       try {
         const data = await fetchRecommendations();
         setAlbums(data);
@@ -26,6 +27,7 @@ export default function App() {
 
   const handleSearch = async () => {
     if (!query.trim()) return;
+    setError('');
     try {
       const data = await searchMusic(query.trim());
       setResults(data);
@@ -34,8 +36,32 @@ export default function App() {
     }
   };
 
-  const topAlbums = useMemo(() => (results?.albums?.items || albums).slice(0, 20), [results, albums]);
-  const artists = useMemo(() => (results?.artists?.items || []).slice(0, 20), [results]);
+  const topAlbums = useMemo(
+    () => (results?.albums?.items || albums).slice(0, 20),
+    [results, albums]
+  );
+
+  const artists = useMemo(() => {
+    if (results?.artists?.items?.length) {
+      return results.artists.items.slice(0, 20);
+    }
+
+    const uniqueArtists = new Map();
+    for (const album of topAlbums) {
+      for (const artist of album.artists || []) {
+        if (!uniqueArtists.has(artist.id)) {
+          uniqueArtists.set(artist.id, {
+            id: artist.id,
+            name: artist.name,
+            followers: { total: 0 },
+            images: []
+          });
+        }
+      }
+    }
+
+    return Array.from(uniqueArtists.values()).slice(0, 20);
+  }, [results, topAlbums]);
 
   return (
     <div className="app-shell">

@@ -4,47 +4,53 @@ export default function useDragScroll() {
   const containerRef = useRef(null);
   const dragState = useRef({ isDown: false, startX: 0, scrollLeft: 0 });
 
-  const onMouseDown = (event) => {
+  const startDrag = (clientX) => {
     const container = containerRef.current;
     if (!container) return;
+    const rect = container.getBoundingClientRect();
     dragState.current = {
       isDown: true,
-      startX: event.pageX - container.offsetLeft,
+      startX: clientX - rect.left,
       scrollLeft: container.scrollLeft
     };
     container.classList.add('dragging');
   };
 
-  const onMouseLeave = () => {
+  const endDrag = () => {
     const container = containerRef.current;
     if (!container) return;
     dragState.current.isDown = false;
     container.classList.remove('dragging');
   };
 
-  const onMouseUp = () => {
-    const container = containerRef.current;
-    if (!container) return;
-    dragState.current.isDown = false;
-    container.classList.remove('dragging');
-  };
-
-  const onMouseMove = (event) => {
+  const moveDrag = (clientX, preventDefault) => {
     const container = containerRef.current;
     if (!container || !dragState.current.isDown) return;
-    event.preventDefault();
-    const x = event.pageX - container.offsetLeft;
+    if (preventDefault) preventDefault();
+    const rect = container.getBoundingClientRect();
+    const x = clientX - rect.left;
     const walk = (x - dragState.current.startX) * 1.5;
     container.scrollLeft = dragState.current.scrollLeft - walk;
   };
 
+  // Use Pointer Events to handle mouse, touch, and pen uniformly
+  const onPointerDown = (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    startDrag(event.clientX);
+  };
+  const onPointerMove = (event) => moveDrag(event.clientX, () => event.preventDefault());
+  const onPointerUp = () => endDrag();
+  const onPointerCancel = () => endDrag();
+  const onPointerLeave = () => endDrag();
+
   return {
     containerRef,
     dragHandlers: {
-      onMouseDown,
-      onMouseLeave,
-      onMouseUp,
-      onMouseMove
+      onPointerDown,
+      onPointerMove,
+      onPointerUp,
+      onPointerCancel,
+      onPointerLeave
     }
   };
 }
