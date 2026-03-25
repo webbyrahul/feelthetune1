@@ -14,6 +14,7 @@ export default function Navbar({ query, onQueryChange, onSearch }) {
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder="Search tracks, albums, artists..."
+          aria-label="Search tracks, albums, artists"
         />
         <button type="submit">Search</button>
       </form>

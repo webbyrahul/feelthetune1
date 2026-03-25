@@ -13,6 +13,7 @@ export default function App() {
 
   useEffect(() => {
     const load = async () => {
+      setError('');
       try {
         const data = await fetchRecommendations();
         setAlbums(data);
@@ -26,6 +27,7 @@ export default function App() {
 
   const handleSearch = async () => {
     if (!query.trim()) return;
+    setError('');
     try {
       const data = await searchMusic(query.trim());
       setResults(data);

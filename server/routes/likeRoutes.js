@@ -5,6 +5,6 @@ const router = Router();
 
 router.get('/:userId', getLikedTracks);
 router.post('/', likeTrack);
-router.delete('/', unlikeTrack);
+router.delete('/:userId/:trackId', unlikeTrack);
 
 export default router;
