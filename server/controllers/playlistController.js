@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import Playlist from '../models/Playlist.js';
 
 export const getUserPlaylists = async (req, res, next) => {
@@ -27,10 +26,6 @@ export const addTrackToPlaylist = async (req, res, next) => {
   try {
     const { playlistId } = req.params;
     const { trackId, name, artist, album, imageUrl, previewUrl } = req.body;
-
-    if (!mongoose.Types.ObjectId.isValid(playlistId)) {
-      return res.status(400).json({ message: 'Invalid playlistId' });
-    }
 
     if (!trackId || !name) {
       return res.status(400).json({ message: 'trackId and name are required' });

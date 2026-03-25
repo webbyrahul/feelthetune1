@@ -1,9 +1,15 @@
 import { spotifyRequest } from '../services/spotifyService.js';
 
+const sanitizeLimit = (value, fallback = 20, max = 20) => {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed < 1) return fallback;
+  return Math.min(parsed, max);
+};
+
 export const getRecommendations = async (_req, res, next) => {
   try {
     try {
-      const data = await spotifyRequest('/browse/new-releases', { limit: 20, country: 'US' });
+      const data = await spotifyRequest('/browse/new-releases', { limit: sanitizeLimit(20), country: 'US' });
       return res.json({ albums: data.albums.items, source: 'new-releases' });
     } catch (error) {
       // Some Spotify apps/tokens can receive 403 on browse endpoints.
@@ -12,7 +18,7 @@ export const getRecommendations = async (_req, res, next) => {
       const fallback = await spotifyRequest('/search', {
         q: 'top hits',
         type: 'track',
-        limit: 30,
+        limit: sanitizeLimit(20),
         market: 'US'
       });
 
@@ -39,7 +45,7 @@ export const searchMusic = async (req, res, next) => {
     const { q, type = 'track,album,artist', limit = 20 } = req.query;
     if (!q) return res.status(400).json({ message: 'Query param q is required' });
 
-    const data = await spotifyRequest('/search', { q, type, limit });
+    const data = await spotifyRequest('/search', { q, type, limit: sanitizeLimit(limit) });
     res.json(data);
   } catch (error) {
     next(error);
@@ -49,7 +55,7 @@ export const searchMusic = async (req, res, next) => {
 export const getNewReleases = async (req, res, next) => {
   try {
     const { limit = 20, country = 'US' } = req.query;
-    const data = await spotifyRequest('/browse/new-releases', { limit, country });
+    const data = await spotifyRequest('/browse/new-releases', { limit: sanitizeLimit(limit), country });
     res.json(data);
   } catch (error) {
     next(error);
