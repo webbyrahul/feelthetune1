@@ -36,7 +36,11 @@ export default function App() {
     }
   };
 
-  const topAlbums = useMemo(() => (results?.albums?.items || albums).slice(0, 20), [results, albums]);
+  const topAlbums = useMemo(
+    () => (results?.albums?.items || albums).slice(0, 20),
+    [results, albums]
+  );
+
   const artists = useMemo(() => {
     if (results?.artists?.items?.length) {
       return results.artists.items.slice(0, 20);
