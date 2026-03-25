@@ -43,12 +43,20 @@ const getAccessToken = async () => {
 };
 
 const spotifyRequest = async (url, params = {}) => {
-  const token = await getAccessToken();
-  const response = await spotifyApi.get(url, {
-    params,
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return response.data;
+  try {
+    const token = await getAccessToken();
+    const response = await spotifyApi.get(url, {
+      params,
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  } catch (error) {
+    const spotifyMessage = error.response?.data?.error?.message;
+    if (spotifyMessage) {
+      error.message = `Spotify API error: ${spotifyMessage}`;
+    }
+    throw error;
+  }
 };
 
 export { spotifyRequest };
