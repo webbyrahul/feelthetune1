@@ -36,7 +36,28 @@ export const getRecommendations = async (_req, res, next) => {
       });
     }
   } catch (error) {
-    next(error);
+    // Keep homepage usable even when Spotify blocks recommendations.
+    try {
+      const genreFallback = await spotifyRequest('/search', {
+        q: 'genre:pop',
+        type: 'album',
+        limit: sanitizeLimit(20),
+        market: 'US'
+      });
+
+      return res.json({
+        albums: genreFallback.albums?.items || [],
+        source: 'genre-fallback',
+        warning: 'Spotify recommendation endpoints unavailable. Served fallback results.'
+      });
+    } catch (fallbackError) {
+      console.error('Recommendation fallback failed:', fallbackError.message);
+      return res.status(200).json({
+        albums: [],
+        source: 'empty-fallback',
+        warning: 'Unable to fetch recommendations from Spotify right now.'
+      });
+    }
   }
 };
 
