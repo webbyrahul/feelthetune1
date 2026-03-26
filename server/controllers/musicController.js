@@ -9,7 +9,7 @@ const sanitizeLimit = (value, fallback = 20, max = 20) => {
 export const getRecommendations = async (_req, res, next) => {
   try {
     try {
-      const data = await spotifyRequest('/browse/new-releases', { limit: sanitizeLimit(20), country: 'US' });
+      const data = await spotifyRequest('/browse/new-releases', { country: 'US' });
       return res.json({ albums: data.albums.items, source: 'new-releases' });
     } catch (error) {
       // Some Spotify apps/tokens can receive 403 on browse endpoints.
@@ -18,7 +18,6 @@ export const getRecommendations = async (_req, res, next) => {
       const fallback = await spotifyRequest('/search', {
         q: 'top hits',
         type: 'track',
-        limit: sanitizeLimit(20),
         market: 'US'
       });
 
@@ -41,7 +40,6 @@ export const getRecommendations = async (_req, res, next) => {
       const genreFallback = await spotifyRequest('/search', {
         q: 'genre:pop',
         type: 'album',
-        limit: sanitizeLimit(20),
         market: 'US'
       });
 
@@ -51,7 +49,7 @@ export const getRecommendations = async (_req, res, next) => {
         warning: 'Spotify recommendation endpoints unavailable. Served fallback results.'
       });
     } catch (fallbackError) {
-      console.error('Recommendation fallback failed:', fallbackError.message);
+      console.error('Recommendation fallback failed at genre search:', fallbackError.message);
       return res.status(200).json({
         albums: [],
         source: 'empty-fallback',
