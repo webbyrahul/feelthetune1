@@ -37,3 +37,13 @@ export const addTrackToPlaylist = async (playlistId, payload) => {
   const response = await api.post(`/playlists/${playlistId}/tracks`, payload);
   return response.data;
 };
+
+export const signup = async (payload) => {
+  const response = await api.post('/auth/signup', payload);
+  return response.data;
+};
+
+export const login = async (payload) => {
+  const response = await api.post('/auth/login', payload);
+  return response.data;
+};

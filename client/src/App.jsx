@@ -3,13 +3,21 @@ import Navbar from './components/Navbar';
 import MediaCard from './components/MediaCard';
 import HorizontalScroller from './components/HorizontalScroller';
 import Footer from './components/Footer';
-import { fetchRecommendations, searchMusic } from './services/api';
+import AuthModal from './components/AuthModal';
+import { fetchRecommendations, searchMusic, signup, login } from './services/api';
 
 export default function App() {
   const [albums, setAlbums] = useState([]);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null);
   const [error, setError] = useState('');
+  const [authMode, setAuthMode] = useState(null);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const [currentUser, setCurrentUser] = useState(() => {
+    const user = localStorage.getItem('ftt_user');
+    return user ? JSON.parse(user) : null;
+  });
 
   useEffect(() => {
     const load = async () => {
@@ -31,6 +39,24 @@ export default function App() {
       setResults(data);
     } catch {
       setError('Search failed.');
+    }
+  };
+
+  const handleAuth = async (form) => {
+    try {
+      setAuthLoading(true);
+      setAuthError('');
+      const action = authMode === 'signup' ? signup : login;
+      const payload = authMode === 'signup' ? form : { email: form.email, password: form.password };
+      const data = await action(payload);
+      localStorage.setItem('ftt_token', data.token);
+      localStorage.setItem('ftt_user', JSON.stringify(data.user));
+      setCurrentUser(data.user);
+      setAuthMode(null);
+    } catch (authErr) {
+      setAuthError(authErr.response?.data?.message || 'Authentication failed');
+    } finally {
+      setAuthLoading(false);
     }
   };
 
@@ -59,7 +85,14 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Navbar query={query} onQueryChange={setQuery} onSearch={handleSearch} />
+      <Navbar
+        query={query}
+        onQueryChange={setQuery}
+        onSearch={handleSearch}
+        onSignup={() => setAuthMode('signup')}
+        onLogin={() => setAuthMode('login')}
+        currentUser={currentUser}
+      />
 
       <main className="dashboard">
         <header>
@@ -98,6 +131,16 @@ export default function App() {
       </main>
 
       <Footer />
+
+      {authMode && (
+        <AuthModal
+          mode={authMode}
+          onClose={() => setAuthMode(null)}
+          onSubmit={handleAuth}
+          loading={authLoading}
+          error={authError}
+        />
+      )}
     </div>
   );
 }

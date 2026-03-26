@@ -6,6 +6,7 @@ import connectDB from './config/db.js';
 import musicRoutes from './routes/musicRoutes.js';
 import playlistRoutes from './routes/playlistRoutes.js';
 import likeRoutes from './routes/likeRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 
 dotenv.config();
 
@@ -25,6 +26,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/music', musicRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/likes', likeRoutes);
+app.use('/api/auth', authRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);
