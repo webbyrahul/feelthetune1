@@ -189,6 +189,10 @@ button.secondary {
   cursor: pointer;
 }
 
+.track-list li.track-disabled {
+  opacity: 0.6;
+}
+
 .track-index {
   color: #94a3b8;
 }

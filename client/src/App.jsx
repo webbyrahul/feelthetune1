@@ -169,9 +169,23 @@ export default function App() {
 
   const currentTrack = currentTrackIndex >= 0 ? currentQueue[currentTrackIndex] : null;
 
+  const findPlayableIndex = (startIndex, direction = 1) => {
+    if (!currentQueue.length) return -1;
+    for (let step = 0; step < currentQueue.length; step += 1) {
+      const idx = (startIndex + step * direction + currentQueue.length) % currentQueue.length;
+      if (currentQueue[idx]?.preview_url) return idx;
+    }
+    return -1;
+  };
+
   const playTrackAtIndex = (index) => {
     if (!currentQueue[index]) return;
-    setCurrentTrackIndex(index);
+    const playableIndex = currentQueue[index]?.preview_url ? index : findPlayableIndex(index);
+    if (playableIndex === -1) {
+      setError('No playable previews available in this list.');
+      return;
+    }
+    setCurrentTrackIndex(playableIndex);
   };
 
   const togglePlayPause = async () => {
@@ -188,12 +202,12 @@ export default function App() {
 
   const goNext = () => {
     if (!currentQueue.length) return;
-    setCurrentTrackIndex((prev) => (prev + 1) % currentQueue.length);
+    setCurrentTrackIndex((prev) => findPlayableIndex((prev + 1 + currentQueue.length) % currentQueue.length, 1));
   };
 
   const goPrev = () => {
     if (!currentQueue.length) return;
-    setCurrentTrackIndex((prev) => (prev - 1 + currentQueue.length) % currentQueue.length);
+    setCurrentTrackIndex((prev) => findPlayableIndex((prev - 1 + currentQueue.length) % currentQueue.length, -1));
   };
 
   const onSeek = (event) => {
@@ -291,14 +305,20 @@ export default function App() {
                 </div>
                 <ul className="track-list">
                   {selectedTracks.map((track, index) => (
-                    <li key={track.id || `${track.name}-${index}`} onClick={() => playTrackAtIndex(index)}>
+                    <li
+                      key={track.id || `${track.name}-${index}`}
+                      onClick={() => playTrackAtIndex(index)}
+                      className={!track.preview_url ? 'track-disabled' : ''}
+                    >
                       <span className="track-index">{index + 1}</span>
                       <div className="track-meta">
                         <span>{track.name}</span>
                         <small>{(track.artists || []).map((artist) => artist.name).join(', ')}</small>
                       </div>
                       <small>
-                        {track.duration_ms
+                        {!track.preview_url
+                          ? 'No preview'
+                          : track.duration_ms
                           ? `${Math.floor(track.duration_ms / 60000)}:${String(Math.floor((track.duration_ms % 60000) / 1000)).padStart(2, '0')}`
                           : ''}
                       </small>
