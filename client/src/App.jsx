@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Navbar from './components/Navbar';
 import MediaCard from './components/MediaCard';
 import HorizontalScroller from './components/HorizontalScroller';
@@ -30,6 +30,12 @@ export default function App() {
   const [selectedView, setSelectedView] = useState(null);
   const [selectedTracks, setSelectedTracks] = useState([]);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const [currentQueue, setCurrentQueue] = useState([]);
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(-1);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef(null);
 
   useEffect(() => {
     const load = async () => {
@@ -135,6 +141,8 @@ export default function App() {
       setSelectedView({ type: 'album', id: album.id, title: album.name });
       const data = await fetchAlbumTracks(album.id);
       setSelectedTracks(data.tracks || []);
+      setCurrentQueue(data.tracks || []);
+      setCurrentTrackIndex(-1);
     } catch {
       setSelectedTracks([]);
       setError('Unable to load album songs.');
@@ -149,6 +157,8 @@ export default function App() {
       setSelectedView({ type: 'artist', id: artist.id, title: artist.name });
       const tracks = await fetchArtistTopTracks(artist.id);
       setSelectedTracks(tracks);
+      setCurrentQueue(tracks);
+      setCurrentTrackIndex(-1);
     } catch {
       setSelectedTracks([]);
       setError('Unable to load artist songs.');
@@ -156,6 +166,66 @@ export default function App() {
       setDetailsLoading(false);
     }
   };
+
+  const currentTrack = currentTrackIndex >= 0 ? currentQueue[currentTrackIndex] : null;
+
+  const playTrackAtIndex = (index) => {
+    if (!currentQueue[index]) return;
+    setCurrentTrackIndex(index);
+  };
+
+  const togglePlayPause = async () => {
+    const audio = audioRef.current;
+    if (!audio || !currentTrack?.preview_url) return;
+    if (audio.paused) {
+      await audio.play();
+      setIsPlaying(true);
+    } else {
+      audio.pause();
+      setIsPlaying(false);
+    }
+  };
+
+  const goNext = () => {
+    if (!currentQueue.length) return;
+    setCurrentTrackIndex((prev) => (prev + 1) % currentQueue.length);
+  };
+
+  const goPrev = () => {
+    if (!currentQueue.length) return;
+    setCurrentTrackIndex((prev) => (prev - 1 + currentQueue.length) % currentQueue.length);
+  };
+
+  const onSeek = (event) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const time = Number(event.target.value);
+    audio.currentTime = time;
+    setCurrentTime(time);
+  };
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !currentTrack?.preview_url) return;
+    audio.src = currentTrack.preview_url;
+    audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+  }, [currentTrackIndex, currentTrack?.preview_url]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onTime = () => setCurrentTime(audio.currentTime || 0);
+    const onLoaded = () => setDuration(audio.duration || 0);
+    const onEnded = () => goNext();
+    audio.addEventListener('timeupdate', onTime);
+    audio.addEventListener('loadedmetadata', onLoaded);
+    audio.addEventListener('ended', onEnded);
+    return () => {
+      audio.removeEventListener('timeupdate', onTime);
+      audio.removeEventListener('loadedmetadata', onLoaded);
+      audio.removeEventListener('ended', onEnded);
+    };
+  }, [currentQueue.length]);
 
   return (
     <div className="app-shell">
@@ -221,7 +291,7 @@ export default function App() {
                 </div>
                 <ul className="track-list">
                   {selectedTracks.map((track, index) => (
-                    <li key={track.id || `${track.name}-${index}`}>
+                    <li key={track.id || `${track.name}-${index}`} onClick={() => playTrackAtIndex(index)}>
                       <span className="track-index">{index + 1}</span>
                       <div className="track-meta">
                         <span>{track.name}</span>
@@ -244,6 +314,32 @@ export default function App() {
       </main>
 
       <Footer />
+
+      <audio ref={audioRef} />
+      <div className="player-bar">
+        <div className="now-playing">
+          <strong>{currentTrack?.name || 'Select a song'}</strong>
+          <small>{currentTrack ? (currentTrack.artists || []).map((artist) => artist.name).join(', ') : 'No song selected'}</small>
+        </div>
+        <div className="player-controls">
+          <button onClick={goPrev} disabled={!currentQueue.length}>
+            ◀◀
+          </button>
+          <button onClick={togglePlayPause} disabled={!currentTrack?.preview_url}>
+            {isPlaying ? 'Pause' : 'Play'}
+          </button>
+          <button onClick={goNext} disabled={!currentQueue.length}>
+            ▶▶
+          </button>
+        </div>
+        <div className="seek-wrap">
+          <input type="range" min="0" max={duration || 0} value={currentTime} onChange={onSeek} />
+          <small>
+            {Math.floor(currentTime / 60)}:{String(Math.floor(currentTime % 60)).padStart(2, '0')} /{' '}
+            {Math.floor((duration || 0) / 60)}:{String(Math.floor((duration || 0) % 60)).padStart(2, '0')}
+          </small>
+        </div>
+      </div>
 
       {authMode && (
         <AuthModal
