@@ -1,4 +1,5 @@
 import { spotifyRequest } from '../services/spotifyService.js';
+import axios from 'axios';
 
 const sanitizeLimit = (value, fallback = 20, max = 20) => {
   const parsed = Number.parseInt(value, 10);
@@ -6,6 +7,43 @@ const sanitizeLimit = (value, fallback = 20, max = 20) => {
   return Math.min(parsed, max);
 };
 const DEFAULT_MARKET = process.env.SPOTIFY_MARKET || 'IN';
+
+const fetchPreviewFallback = async (trackName, artistName) => {
+  try {
+    const query = `track:\"${trackName}\" artist:\"${artistName}\"`;
+    const response = await axios.get('https://api.deezer.com/search', {
+      params: { q: query, limit: 1 },
+      timeout: 6000
+    });
+    return response.data?.data?.[0]?.preview || null;
+  } catch {
+    return null;
+  }
+};
+
+const enrichTracksWithPreview = async (tracks) => {
+  const missingPreview = tracks
+    .map((track, index) => ({ track, index }))
+    .filter(({ track }) => !track.preview_url)
+    .slice(0, 15);
+
+  if (!missingPreview.length) return tracks;
+
+  const resolved = await Promise.all(
+    missingPreview.map(async ({ track, index }) => {
+      const fallbackPreview = await fetchPreviewFallback(track.name, track.artists?.[0]?.name || '');
+      return { index, fallbackPreview };
+    })
+  );
+
+  const updated = [...tracks];
+  for (const { index, fallbackPreview } of resolved) {
+    if (fallbackPreview) {
+      updated[index] = { ...updated[index], preview_url: fallbackPreview };
+    }
+  }
+  return updated;
+};
 
 export const getRecommendations = async (_req, res, next) => {
   try {
@@ -87,7 +125,8 @@ export const getArtistTopTracks = async (req, res, next) => {
     const { artistId } = req.params;
     const { market = DEFAULT_MARKET } = req.query;
     const data = await spotifyRequest(`/artists/${artistId}/top-tracks`, { market });
-    res.json(data);
+    const tracks = await enrichTracksWithPreview(data.tracks || []);
+    res.json({ ...data, tracks });
   } catch (error) {
     next(error);
   }
@@ -101,10 +140,11 @@ export const getAlbumTracks = async (req, res, next) => {
       spotifyRequest(`/albums/${albumId}`),
       spotifyRequest(`/albums/${albumId}/tracks`, { market, limit: 50 })
     ]);
+    const tracks = await enrichTracksWithPreview(tracksData.items || []);
 
     res.json({
       album: albumData,
-      tracks: tracksData.items || []
+      tracks
     });
   } catch (error) {
     next(error);
