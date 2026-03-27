@@ -93,6 +93,24 @@ export const getArtistTopTracks = async (req, res, next) => {
   }
 };
 
+export const getAlbumTracks = async (req, res, next) => {
+  try {
+    const { albumId } = req.params;
+    const { market = DEFAULT_MARKET } = req.query;
+    const [albumData, tracksData] = await Promise.all([
+      spotifyRequest(`/albums/${albumId}`),
+      spotifyRequest(`/albums/${albumId}/tracks`, { market, limit: 50 })
+    ]);
+
+    res.json({
+      album: albumData,
+      tracks: tracksData.items || []
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getArtistsByIds = async (req, res, next) => {
   try {
     const { ids } = req.query;

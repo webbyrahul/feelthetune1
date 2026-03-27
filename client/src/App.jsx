@@ -4,7 +4,15 @@ import MediaCard from './components/MediaCard';
 import HorizontalScroller from './components/HorizontalScroller';
 import Footer from './components/Footer';
 import AuthModal from './components/AuthModal';
-import { fetchRecommendations, searchMusic, signup, login, fetchArtistsByIds } from './services/api';
+import {
+  fetchRecommendations,
+  searchMusic,
+  signup,
+  login,
+  fetchArtistsByIds,
+  fetchAlbumTracks,
+  fetchArtistTopTracks
+} from './services/api';
 
 export default function App() {
   const [albums, setAlbums] = useState([]);
@@ -19,6 +27,9 @@ export default function App() {
     return user ? JSON.parse(user) : null;
   });
   const [artistDetails, setArtistDetails] = useState([]);
+  const [selectedView, setSelectedView] = useState(null);
+  const [selectedTracks, setSelectedTracks] = useState([]);
+  const [detailsLoading, setDetailsLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -118,6 +129,34 @@ export default function App() {
     return Array.from(uniqueArtists.values()).slice(0, 20);
   }, [results, topAlbums, artistDetails]);
 
+  const openAlbumDetails = async (album) => {
+    try {
+      setDetailsLoading(true);
+      setSelectedView({ type: 'album', id: album.id, title: album.name });
+      const data = await fetchAlbumTracks(album.id);
+      setSelectedTracks(data.tracks || []);
+    } catch {
+      setSelectedTracks([]);
+      setError('Unable to load album songs.');
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  const openArtistDetails = async (artist) => {
+    try {
+      setDetailsLoading(true);
+      setSelectedView({ type: 'artist', id: artist.id, title: artist.name });
+      const tracks = await fetchArtistTopTracks(artist.id);
+      setSelectedTracks(tracks);
+    } catch {
+      setSelectedTracks([]);
+      setError('Unable to load artist songs.');
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
   return (
     <div className="app-shell">
       <Navbar
@@ -145,6 +184,7 @@ export default function App() {
                 title={album.name}
                 subtitle={(album.artists || []).map((artist) => artist.name).join(', ')}
                 image={album.images?.[1]?.url || album.images?.[0]?.url || 'https://via.placeholder.com/240'}
+                onClick={() => openAlbumDetails(album)}
               />
             ))}
           </HorizontalScroller>
@@ -159,10 +199,33 @@ export default function App() {
                 title={artist.name}
                 subtitle={`${artist.followers?.total?.toLocaleString() || 0} followers`}
                 image={artist.images?.[1]?.url || artist.images?.[0]?.url || 'https://via.placeholder.com/240'}
+                onClick={() => openArtistDetails(artist)}
               />
             ))}
           </HorizontalScroller>
         </section>
+
+        {selectedView && (
+          <section className="details-panel">
+            <h3>
+              {selectedView.type === 'album' ? 'Album Songs' : 'Artist Top Songs'} · {selectedView.title}
+            </h3>
+            {detailsLoading ? (
+              <p>Loading songs...</p>
+            ) : selectedTracks.length ? (
+              <ul className="track-list">
+                {selectedTracks.map((track) => (
+                  <li key={track.id}>
+                    <span>{track.name}</span>
+                    <small>{track.duration_ms ? `${Math.floor(track.duration_ms / 60000)}:${String(Math.floor((track.duration_ms % 60000) / 1000)).padStart(2, '0')}` : ''}</small>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No songs found for this selection.</p>
+            )}
+          </section>
+        )}
       </main>
 
       <Footer />

@@ -52,6 +52,7 @@ npm run dev
 - `GET /api/music/search?q=<term>&type=track,album,artist`
 - `GET /api/music/new-releases`
 - `GET /api/music/artist-top-tracks/:artistId`
+- `GET /api/music/album-tracks/:albumId`
 - `GET /api/music/artists?ids=<comma-separated-artist-ids>`
 - `POST /api/auth/signup`
 - `POST /api/auth/login`

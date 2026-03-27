@@ -106,6 +106,15 @@ button.secondary {
   padding: 0.75rem;
 }
 
+.media-card.clickable {
+  cursor: pointer;
+}
+
+.media-card.clickable:hover {
+  transform: translateY(-2px);
+  border-color: #22c55e;
+}
+
 .media-card img {
   width: 100%;
   aspect-ratio: 1 / 1;
@@ -134,6 +143,32 @@ button.secondary {
 
 .error {
   color: #fca5a5;
+}
+
+.details-panel {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.75);
+}
+
+.track-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.track-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.45);
 }
 
 .modal-backdrop {

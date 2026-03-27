@@ -54,3 +54,13 @@ export const fetchArtistsByIds = async (artistIds) => {
   });
   return response.data.artists || [];
 };
+
+export const fetchAlbumTracks = async (albumId) => {
+  const response = await api.get(`/music/album-tracks/${albumId}`);
+  return response.data;
+};
+
+export const fetchArtistTopTracks = async (artistId) => {
+  const response = await api.get(`/music/artist-top-tracks/${artistId}`);
+  return response.data.tracks || [];
+};
