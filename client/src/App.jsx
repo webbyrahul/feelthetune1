@@ -213,14 +213,29 @@ export default function App() {
             {detailsLoading ? (
               <p>Loading songs...</p>
             ) : selectedTracks.length ? (
-              <ul className="track-list">
-                {selectedTracks.map((track) => (
-                  <li key={track.id}>
-                    <span>{track.name}</span>
-                    <small>{track.duration_ms ? `${Math.floor(track.duration_ms / 60000)}:${String(Math.floor((track.duration_ms % 60000) / 1000)).padStart(2, '0')}` : ''}</small>
-                  </li>
-                ))}
-              </ul>
+              <div className="track-table">
+                <div className="track-head">
+                  <span>#</span>
+                  <span>Song</span>
+                  <span>Duration</span>
+                </div>
+                <ul className="track-list">
+                  {selectedTracks.map((track, index) => (
+                    <li key={track.id || `${track.name}-${index}`}>
+                      <span className="track-index">{index + 1}</span>
+                      <div className="track-meta">
+                        <span>{track.name}</span>
+                        <small>{(track.artists || []).map((artist) => artist.name).join(', ')}</small>
+                      </div>
+                      <small>
+                        {track.duration_ms
+                          ? `${Math.floor(track.duration_ms / 60000)}:${String(Math.floor((track.duration_ms % 60000) / 1000)).padStart(2, '0')}`
+                          : ''}
+                      </small>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : (
               <p>No songs found for this selection.</p>
             )}
