@@ -161,6 +161,13 @@ export const getArtistsByIds = async (req, res, next) => {
     const data = await spotifyRequest('/artists', { ids: idList.join(',') });
     res.json({ artists: data.artists || [] });
   } catch (error) {
+    if (error.response?.status === 403) {
+      // Some Spotify apps block /artists for client-credentials tokens.
+      return res.status(200).json({
+        artists: [],
+        warning: 'Spotify artists endpoint is restricted for this app/token.'
+      });
+    }
     next(error);
   }
 };
