@@ -92,9 +92,17 @@ export const searchMusic = async (req, res, next) => {
   try {
     const { q, type = 'track,album,artist', limit = 20 } = req.query;
     if (!q) return res.status(400).json({ message: 'Query param q is required' });
+    try {
+      const data = await spotifyRequest('/search', { q, type, limit: sanitizeLimit(limit) });
+      return res.json(data);
+    } catch (error) {
+      const isInvalidLimit = error.response?.status === 400 && /invalid limit/i.test(error.message || '');
+      if (!isInvalidLimit) throw error;
 
-    const data = await spotifyRequest('/search', { q, type, limit: sanitizeLimit(limit) });
-    res.json(data);
+      // Fallback for Spotify apps that reject explicit search limit values.
+      const data = await spotifyRequest('/search', { q, type });
+      return res.json(data);
+    }
   } catch (error) {
     next(error);
   }
