@@ -1,5 +1,4 @@
 import { spotifyRequest } from '../services/spotifyService.js';
-import axios from 'axios';
 
 const sanitizeLimit = (value, fallback = 20, max = 20) => {
   const parsed = Number.parseInt(value, 10);
@@ -8,38 +7,29 @@ const sanitizeLimit = (value, fallback = 20, max = 20) => {
 };
 const DEFAULT_MARKET = process.env.SPOTIFY_MARKET || 'IN';
 
-const fetchPreviewFallback = async (trackName, artistName) => {
-  try {
-    const query = `track:\"${trackName}\" artist:\"${artistName}\"`;
-    const response = await axios.get('https://api.deezer.com/search', {
-      params: { q: query, limit: 1 },
-      timeout: 6000
-    });
-    return response.data?.data?.[0]?.preview || null;
-  } catch {
-    return null;
-  }
-};
-
 const enrichTracksWithPreview = async (tracks) => {
   const missingPreview = tracks
     .map((track, index) => ({ track, index }))
-    .filter(({ track }) => !track.preview_url)
-    .slice(0, 15);
+    .filter(({ track }) => !track.preview_url && track.id)
+    .slice(0, 20);
 
   if (!missingPreview.length) return tracks;
 
   const resolved = await Promise.all(
     missingPreview.map(async ({ track, index }) => {
-      const fallbackPreview = await fetchPreviewFallback(track.name, track.artists?.[0]?.name || '');
-      return { index, fallbackPreview };
+      try {
+        const fullTrack = await spotifyRequest(`/tracks/${track.id}`, { market: DEFAULT_MARKET });
+        return { index, previewUrl: fullTrack.preview_url || null };
+      } catch {
+        return { index, previewUrl: null };
+      }
     })
   );
 
   const updated = [...tracks];
-  for (const { index, fallbackPreview } of resolved) {
-    if (fallbackPreview) {
-      updated[index] = { ...updated[index], preview_url: fallbackPreview };
+  for (const { index, previewUrl } of resolved) {
+    if (previewUrl) {
+      updated[index] = { ...updated[index], preview_url: previewUrl };
     }
   }
   return updated;
