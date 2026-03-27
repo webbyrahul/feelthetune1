@@ -5,11 +5,12 @@ const sanitizeLimit = (value, fallback = 20, max = 20) => {
   if (Number.isNaN(parsed) || parsed < 1) return fallback;
   return Math.min(parsed, max);
 };
+const DEFAULT_MARKET = process.env.SPOTIFY_MARKET || 'IN';
 
 export const getRecommendations = async (_req, res, next) => {
   try {
     try {
-      const data = await spotifyRequest('/browse/new-releases', { country: 'US' });
+      const data = await spotifyRequest('/browse/new-releases', { country: DEFAULT_MARKET });
       return res.json({ albums: data.albums.items, source: 'new-releases' });
     } catch (error) {
       // Some Spotify apps/tokens can receive 403 on browse endpoints.
@@ -18,7 +19,7 @@ export const getRecommendations = async (_req, res, next) => {
       const fallback = await spotifyRequest('/search', {
         q: 'top hits',
         type: 'track',
-        market: 'US'
+        market: DEFAULT_MARKET
       });
 
       const uniqueAlbums = new Map();
@@ -40,7 +41,7 @@ export const getRecommendations = async (_req, res, next) => {
       const genreFallback = await spotifyRequest('/search', {
         q: 'genre:pop',
         type: 'album',
-        market: 'US'
+        market: DEFAULT_MARKET
       });
 
       return res.json({
@@ -73,7 +74,7 @@ export const searchMusic = async (req, res, next) => {
 
 export const getNewReleases = async (req, res, next) => {
   try {
-    const { limit = 20, country = 'US' } = req.query;
+    const { limit = 20, country = DEFAULT_MARKET } = req.query;
     const data = await spotifyRequest('/browse/new-releases', { limit: sanitizeLimit(limit), country });
     res.json(data);
   } catch (error) {
@@ -84,7 +85,7 @@ export const getNewReleases = async (req, res, next) => {
 export const getArtistTopTracks = async (req, res, next) => {
   try {
     const { artistId } = req.params;
-    const { market = 'US' } = req.query;
+    const { market = DEFAULT_MARKET } = req.query;
     const data = await spotifyRequest(`/artists/${artistId}/top-tracks`, { market });
     res.json(data);
   } catch (error) {

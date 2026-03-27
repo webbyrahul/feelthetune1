@@ -34,6 +34,7 @@ PORT=5000
 MONGO_URI=mongodb://127.0.0.1:27017/feelthetune
 SPOTIFY_CLIENT_ID=your_spotify_client_id
 SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
+SPOTIFY_MARKET=IN
 CLIENT_URL=http://localhost:5173
 JWT_SECRET=change_this_secret
 ```
