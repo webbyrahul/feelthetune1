@@ -92,3 +92,27 @@ export const getArtistTopTracks = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getArtistsByIds = async (req, res, next) => {
+  try {
+    const { ids } = req.query;
+    if (!ids) {
+      return res.status(400).json({ message: 'Query param ids is required' });
+    }
+
+    const idList = String(ids)
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean)
+      .slice(0, 50);
+
+    if (!idList.length) {
+      return res.status(400).json({ message: 'At least one artist id is required' });
+    }
+
+    const data = await spotifyRequest('/artists', { ids: idList.join(',') });
+    res.json({ artists: data.artists || [] });
+  } catch (error) {
+    next(error);
+  }
+};

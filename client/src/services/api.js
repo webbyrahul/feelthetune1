@@ -47,3 +47,10 @@ export const login = async (payload) => {
   const response = await api.post('/auth/login', payload);
   return response.data;
 };
+
+export const fetchArtistsByIds = async (artistIds) => {
+  const response = await api.get('/music/artists', {
+    params: { ids: artistIds.join(',') }
+  });
+  return response.data.artists || [];
+};

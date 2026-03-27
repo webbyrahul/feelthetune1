@@ -4,7 +4,7 @@ import MediaCard from './components/MediaCard';
 import HorizontalScroller from './components/HorizontalScroller';
 import Footer from './components/Footer';
 import AuthModal from './components/AuthModal';
-import { fetchRecommendations, searchMusic, signup, login } from './services/api';
+import { fetchRecommendations, searchMusic, signup, login, fetchArtistsByIds } from './services/api';
 
 export default function App() {
   const [albums, setAlbums] = useState([]);
@@ -18,6 +18,7 @@ export default function App() {
     const user = localStorage.getItem('ftt_user');
     return user ? JSON.parse(user) : null;
   });
+  const [artistDetails, setArtistDetails] = useState([]);
 
   useEffect(() => {
     const load = async () => {
@@ -61,9 +62,43 @@ export default function App() {
   };
 
   const topAlbums = useMemo(() => (results?.albums?.items || albums).slice(0, 20), [results, albums]);
+
+  useEffect(() => {
+    if (results?.artists?.items?.length) return;
+
+    const artistIds = Array.from(
+      new Set(
+        topAlbums
+          .flatMap((album) => album.artists || [])
+          .map((artist) => artist.id)
+          .filter(Boolean)
+      )
+    ).slice(0, 30);
+
+    if (!artistIds.length) {
+      setArtistDetails([]);
+      return;
+    }
+
+    const loadArtists = async () => {
+      try {
+        const fullArtists = await fetchArtistsByIds(artistIds);
+        setArtistDetails(fullArtists);
+      } catch {
+        setArtistDetails([]);
+      }
+    };
+
+    loadArtists();
+  }, [results, topAlbums]);
+
   const artists = useMemo(() => {
     if (results?.artists?.items?.length) {
       return results.artists.items.slice(0, 20);
+    }
+
+    if (artistDetails.length) {
+      return artistDetails.slice(0, 20);
     }
 
     const uniqueArtists = new Map();
