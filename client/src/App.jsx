@@ -116,7 +116,7 @@ export default function App() {
     }
 
     return Array.from(uniqueArtists.values()).slice(0, 20);
-  }, [results, topAlbums]);
+  }, [results, topAlbums, artistDetails]);
 
   return (
     <div className="app-shell">
