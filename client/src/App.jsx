@@ -34,6 +34,7 @@ export default function App() {
   const [currentQueue, setCurrentQueue] = useState([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(-1);
   const [pendingTrackIndex, setPendingTrackIndex] = useState(null);
+  const [requestedTrack, setRequestedTrack] = useState(null);
   const spotifyToken = localStorage.getItem('spotify_access_token') || import.meta.env.VITE_SPOTIFY_ACCESS_TOKEN;
   const {
     deviceId,
@@ -191,6 +192,7 @@ export default function App() {
   const startPlaybackAtIndex = async (playableIndex) => {
     try {
       setCurrentTrackIndex(playableIndex);
+      setRequestedTrack(currentQueue[playableIndex] || null);
       const queueUris = currentQueue.filter((track) => track.uri).map((track) => track.uri);
       const uriToPlay = currentQueue[playableIndex].uri;
       const offset = queueUris.indexOf(uriToPlay);
@@ -210,8 +212,7 @@ export default function App() {
     }
     if (!deviceId) {
       setPendingTrackIndex(playableIndex);
-      setError('Spotify player is still initializing. Your song will play automatically once ready.');
-      return;
+      setError('Spotify player is initializing; trying active-device playback and will auto-play when ready.');
     }
     await startPlaybackAtIndex(playableIndex);
   };
@@ -318,12 +319,24 @@ export default function App() {
       <div className="player-bar">
         <div className="now-playing">
           <img
-            src={currentTrack?.album?.images?.[2]?.url || currentTrack?.album?.images?.[0]?.url || 'https://via.placeholder.com/56'}
-            alt={currentTrack?.name || 'track'}
+            src={
+              currentTrack?.album?.images?.[2]?.url ||
+              currentTrack?.album?.images?.[0]?.url ||
+              requestedTrack?.album?.images?.[2]?.url ||
+              requestedTrack?.album?.images?.[0]?.url ||
+              'https://via.placeholder.com/56'
+            }
+            alt={currentTrack?.name || requestedTrack?.name || 'track'}
           />
           <div>
-            <strong>{currentTrack?.name || 'Select a song'}</strong>
-            <small>{currentTrack ? (currentTrack.artists || []).map((artist) => artist.name).join(', ') : 'No song selected'}</small>
+            <strong>{currentTrack?.name || requestedTrack?.name || 'Select a song'}</strong>
+            <small>
+              {currentTrack
+                ? (currentTrack.artists || []).map((artist) => artist.name).join(', ')
+                : requestedTrack
+                ? (requestedTrack.artists || []).map((artist) => artist.name).join(', ')
+                : 'No song selected'}
+            </small>
           </div>
         </div>
         <div className="player-controls">

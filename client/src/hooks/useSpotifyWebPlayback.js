@@ -103,9 +103,14 @@ export default function useSpotifyWebPlayback(accessToken) {
   const playTrack = async (trackUri, queueUris = [trackUri], offset = 0) => {
     try {
       if (!accessToken) throw new Error('Missing Spotify access token');
-      if (!deviceId) throw new Error('Player not ready yet. Device ID missing.');
+      const endpoint = deviceId
+        ? `https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`
+        : 'https://api.spotify.com/v1/me/player/play';
+      if (!deviceId) {
+        console.warn('[Spotify Play API] deviceId missing, trying active device fallback');
+      }
 
-      const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+      const response = await fetch(endpoint, {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -121,7 +126,7 @@ export default function useSpotifyWebPlayback(accessToken) {
         const text = await response.text();
         console.error('[Spotify Play API] error:', response.status, text);
         if (response.status === 401) throw new Error('Token expired. Please re-authenticate.');
-        if (response.status === 404) throw new Error('Device not found. Ensure Spotify player is ready.');
+        if (response.status === 404) throw new Error('Device not found. Open Spotify app once or wait for web player ready.');
         throw new Error(`Playback failed (${response.status})`);
       }
 
