@@ -254,7 +254,16 @@ export default function App() {
         currentUser={currentUser}
       />
 
-      <main className="dashboard">
+      <main className="dashboard layout-shell">
+        <aside className="sidebar">
+          <h3>Browse</h3>
+          <button className="sidebar-item active">Home</button>
+          <button className="sidebar-item">Albums</button>
+          <button className="sidebar-item">Artists</button>
+          <button className="sidebar-item">Playlists</button>
+        </aside>
+
+        <section className="main-panel">
         <header>
           <h2>Recommended Music</h2>
           <p>Drag horizontally to explore albums and artists.</p>
@@ -341,6 +350,7 @@ export default function App() {
             )}
           </section>
         )}
+        </section>
       </main>
 
       <Footer />
