@@ -64,3 +64,10 @@ export const fetchArtistTopTracks = async (artistId) => {
   const response = await api.get(`/music/artist-top-tracks/${artistId}`);
   return response.data.tracks || [];
 };
+
+export const fetchSpotifyAccessToken = async () => {
+  const response = await api.get('/spotify/token');
+  return response.data;
+};
+
+export const getSpotifyLoginUrl = () => `${API_BASE_URL}/spotify/login`;

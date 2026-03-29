@@ -12,7 +12,9 @@ import {
   login,
   fetchArtistsByIds,
   fetchAlbumTracks,
-  fetchArtistTopTracks
+  fetchArtistTopTracks,
+  fetchSpotifyAccessToken,
+  getSpotifyLoginUrl
 } from './services/api';
 
 export default function App() {
@@ -35,10 +37,14 @@ export default function App() {
   const [currentTrackIndex, setCurrentTrackIndex] = useState(-1);
   const [pendingTrackIndex, setPendingTrackIndex] = useState(null);
   const [requestedTrack, setRequestedTrack] = useState(null);
-  const [spotifyToken, setSpotifyToken] = useState(
-    () => localStorage.getItem('spotify_access_token') || import.meta.env.VITE_SPOTIFY_ACCESS_TOKEN || ''
-  );
-  const [tokenInput, setTokenInput] = useState(spotifyToken);
+  const [spotifyToken, setSpotifyToken] = useState('');
+  const [isSpotifyAuthed, setIsSpotifyAuthed] = useState(false);
+  const refreshSpotifyToken = async () => {
+    const tokenResponse = await fetchSpotifyAccessToken();
+    setSpotifyToken(tokenResponse.accessToken);
+    setIsSpotifyAuthed(true);
+    return tokenResponse.accessToken;
+  };
   const {
     deviceId,
     isPlaying,
@@ -51,7 +57,14 @@ export default function App() {
     nextTrack,
     previousTrack,
     seek
-  } = useSpotifyWebPlayback(spotifyToken);
+  } = useSpotifyWebPlayback(spotifyToken, refreshSpotifyToken);
+
+  useEffect(() => {
+    refreshSpotifyToken().catch(() => {
+      setSpotifyToken('');
+      setIsSpotifyAuthed(false);
+    });
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -209,7 +222,7 @@ export default function App() {
   const playTrackAtIndex = async (index) => {
     if (!currentQueue[index]) return;
     if (!spotifyToken) {
-      setError('Add your Spotify OAuth access token to enable playback.');
+      setError('Login with Spotify to enable playback.');
       return;
     }
     const playableIndex = currentQueue[index]?.uri ? index : findPlayableIndex(index);
@@ -230,14 +243,6 @@ export default function App() {
     setPendingTrackIndex(null);
   }, [deviceId, pendingTrackIndex]);
 
-  const saveSpotifyToken = () => {
-    const trimmed = tokenInput.trim();
-    if (!trimmed) return;
-    localStorage.setItem('spotify_access_token', trimmed);
-    setSpotifyToken(trimmed);
-    setError('');
-  };
-
   return (
     <div className="app-shell">
       <Navbar
@@ -254,17 +259,11 @@ export default function App() {
           <h2>Recommended Music</h2>
           <p>Drag horizontally to explore albums and artists.</p>
           {(error || playerError) && <p className="error">{error || playerError}</p>}
-          {!spotifyToken && (
+          {!isSpotifyAuthed && (
             <div className="token-box">
-              <p>Add Spotify OAuth access token to enable Web Playback SDK.</p>
+              <p>Login with Spotify to enable Web Playback SDK.</p>
               <div className="token-row">
-                <input
-                  type="text"
-                  value={tokenInput}
-                  onChange={(event) => setTokenInput(event.target.value)}
-                  placeholder="Paste Spotify access token"
-                />
-                <button onClick={saveSpotifyToken}>Save Token</button>
+                <button onClick={() => (window.location.href = getSpotifyLoginUrl())}>Login with Spotify</button>
               </div>
             </div>
           )}

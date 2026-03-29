@@ -37,7 +37,7 @@ SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
 SPOTIFY_MARKET=IN
 CLIENT_URL=http://localhost:5173
 JWT_SECRET=change_this_secret
-VITE_SPOTIFY_ACCESS_TOKEN=your_oauth_access_token
+SPOTIFY_REDIRECT_URI=http://localhost:5000/api/spotify/callback
 ```
 
 ### 3) Run development servers
@@ -57,6 +57,9 @@ npm run dev
 - `GET /api/music/artists?ids=<comma-separated-artist-ids>`
 - `POST /api/auth/signup`
 - `POST /api/auth/login`
+- `GET /api/spotify/login`
+- `GET /api/spotify/callback`
+- `GET /api/spotify/token`
 - `GET /api/playlists/:userId`
 - `POST /api/playlists`
 - `POST /api/playlists/:playlistId/tracks`
@@ -67,5 +70,4 @@ npm run dev
 ## Notes
 - Spotify's client credentials flow is used for catalog browsing/search.
 - User-specific Spotify account features require OAuth user authorization flow; this starter focuses on app-managed playlist/likes with Spotify catalog items.
-- Web Playback SDK uses a user OAuth access token from `localStorage.spotify_access_token` (or `VITE_SPOTIFY_ACCESS_TOKEN` as fallback) and requires a Premium account.
-- If token is missing, app shows a token input box on the main page to save it to localStorage.
+- Web Playback SDK uses Spotify Authorization Code flow via backend routes (`/api/spotify/login`, `/api/spotify/callback`, `/api/spotify/token`) and requires a Premium account.

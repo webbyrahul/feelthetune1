@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 const SDK_URL = 'https://sdk.scdn.co/spotify-player.js';
 
-export default function useSpotifyWebPlayback(accessToken) {
+export default function useSpotifyWebPlayback(accessToken, refreshAccessToken) {
   const [player, setPlayer] = useState(null);
   const [deviceId, setDeviceId] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
@@ -125,14 +125,31 @@ export default function useSpotifyWebPlayback(accessToken) {
       if (!response.ok) {
         const text = await response.text();
         console.error('[Spotify Play API] error:', response.status, text);
-        if (response.status === 401) throw new Error('Token expired. Please re-authenticate.');
-        if (response.status === 404) throw new Error('Device not found. Open Spotify app once or wait for web player ready.');
+        if (response.status === 401 && refreshAccessToken) {
+          await refreshAccessToken();
+          throw new Error('RETRY_PLAYBACK');
+        }
+        if (response.status === 404 && deviceId) {
+          await fetch('https://api.spotify.com/v1/me/player', {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ device_ids: [deviceId], play: false })
+          });
+          throw new Error('RETRY_PLAYBACK');
+        }
+        if (response.status === 404) throw new Error('Device not found. Open Spotify app on any device and retry.');
         throw new Error(`Playback failed (${response.status})`);
       }
 
       console.log('[Spotify Play API] playback started for:', trackUri);
       setError('');
     } catch (err) {
+      if (err.message === 'RETRY_PLAYBACK') {
+        return playTrack(trackUri, queueUris, offset);
+      }
       console.error('[Spotify Play API] failed:', err);
       setError(err.message || 'Failed to play track');
       throw err;
