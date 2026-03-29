@@ -33,6 +33,7 @@ export default function App() {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [currentQueue, setCurrentQueue] = useState([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(-1);
+  const [pendingTrackIndex, setPendingTrackIndex] = useState(null);
   const spotifyToken = localStorage.getItem('spotify_access_token') || import.meta.env.VITE_SPOTIFY_ACCESS_TOKEN;
   const {
     deviceId,
@@ -187,6 +188,19 @@ export default function App() {
     return -1;
   };
 
+  const startPlaybackAtIndex = async (playableIndex) => {
+    try {
+      setCurrentTrackIndex(playableIndex);
+      const queueUris = currentQueue.filter((track) => track.uri).map((track) => track.uri);
+      const uriToPlay = currentQueue[playableIndex].uri;
+      const offset = queueUris.indexOf(uriToPlay);
+      await playTrack(uriToPlay, queueUris.length ? queueUris : [uriToPlay], offset >= 0 ? offset : 0);
+      setError('');
+    } catch (playError) {
+      setError(playError.message || 'Playback failed');
+    }
+  };
+
   const playTrackAtIndex = async (index) => {
     if (!currentQueue[index]) return;
     const playableIndex = currentQueue[index]?.uri ? index : findPlayableIndex(index);
@@ -195,19 +209,18 @@ export default function App() {
       return;
     }
     if (!deviceId) {
-      setError('Spotify player is not ready yet. Wait a moment and try again.');
+      setPendingTrackIndex(playableIndex);
+      setError('Spotify player is still initializing. Your song will play automatically once ready.');
       return;
     }
-    try {
-      setCurrentTrackIndex(playableIndex);
-      const queueUris = currentQueue.filter((track) => track.uri).map((track) => track.uri);
-      const uriToPlay = currentQueue[playableIndex].uri;
-      const offset = queueUris.indexOf(uriToPlay);
-      await playTrack(uriToPlay, queueUris.length ? queueUris : [uriToPlay], offset >= 0 ? offset : 0);
-    } catch (playError) {
-      setError(playError.message || 'Playback failed');
-    }
+    await startPlaybackAtIndex(playableIndex);
   };
+
+  useEffect(() => {
+    if (!deviceId || pendingTrackIndex === null) return;
+    startPlaybackAtIndex(pendingTrackIndex);
+    setPendingTrackIndex(null);
+  }, [deviceId, pendingTrackIndex]);
 
   return (
     <div className="app-shell">
@@ -330,6 +343,7 @@ export default function App() {
             {Math.floor(position / 60000)}:{String(Math.floor((position % 60000) / 1000)).padStart(2, '0')} /{' '}
             {Math.floor((duration || 0) / 60000)}:{String(Math.floor(((duration || 0) % 60000) / 1000)).padStart(2, '0')}
           </small>
+          <small>{deviceId ? 'Spotify device ready' : 'Initializing Spotify device...'}</small>
         </div>
       </div>
 
