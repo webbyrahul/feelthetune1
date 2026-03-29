@@ -222,11 +222,24 @@ button.secondary {
 }
 
 .now-playing {
-  display: grid;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
 }
 
 .now-playing small {
   color: #94a3b8;
+}
+
+.now-playing img {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.now-playing div {
+  display: grid;
 }
 
 .player-controls {
