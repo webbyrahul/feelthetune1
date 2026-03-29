@@ -68,3 +68,4 @@ npm run dev
 - Spotify's client credentials flow is used for catalog browsing/search.
 - User-specific Spotify account features require OAuth user authorization flow; this starter focuses on app-managed playlist/likes with Spotify catalog items.
 - Web Playback SDK uses a user OAuth access token from `localStorage.spotify_access_token` (or `VITE_SPOTIFY_ACCESS_TOKEN` as fallback) and requires a Premium account.
+- If token is missing, app shows a token input box on the main page to save it to localStorage.

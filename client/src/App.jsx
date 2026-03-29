@@ -35,7 +35,10 @@ export default function App() {
   const [currentTrackIndex, setCurrentTrackIndex] = useState(-1);
   const [pendingTrackIndex, setPendingTrackIndex] = useState(null);
   const [requestedTrack, setRequestedTrack] = useState(null);
-  const spotifyToken = localStorage.getItem('spotify_access_token') || import.meta.env.VITE_SPOTIFY_ACCESS_TOKEN;
+  const [spotifyToken, setSpotifyToken] = useState(
+    () => localStorage.getItem('spotify_access_token') || import.meta.env.VITE_SPOTIFY_ACCESS_TOKEN || ''
+  );
+  const [tokenInput, setTokenInput] = useState(spotifyToken);
   const {
     deviceId,
     isPlaying,
@@ -205,6 +208,10 @@ export default function App() {
 
   const playTrackAtIndex = async (index) => {
     if (!currentQueue[index]) return;
+    if (!spotifyToken) {
+      setError('Add your Spotify OAuth access token to enable playback.');
+      return;
+    }
     const playableIndex = currentQueue[index]?.uri ? index : findPlayableIndex(index);
     if (playableIndex === -1) {
       setError('No playable Spotify tracks available in this list.');
@@ -223,6 +230,14 @@ export default function App() {
     setPendingTrackIndex(null);
   }, [deviceId, pendingTrackIndex]);
 
+  const saveSpotifyToken = () => {
+    const trimmed = tokenInput.trim();
+    if (!trimmed) return;
+    localStorage.setItem('spotify_access_token', trimmed);
+    setSpotifyToken(trimmed);
+    setError('');
+  };
+
   return (
     <div className="app-shell">
       <Navbar
@@ -239,6 +254,20 @@ export default function App() {
           <h2>Recommended Music</h2>
           <p>Drag horizontally to explore albums and artists.</p>
           {(error || playerError) && <p className="error">{error || playerError}</p>}
+          {!spotifyToken && (
+            <div className="token-box">
+              <p>Add Spotify OAuth access token to enable Web Playback SDK.</p>
+              <div className="token-row">
+                <input
+                  type="text"
+                  value={tokenInput}
+                  onChange={(event) => setTokenInput(event.target.value)}
+                  placeholder="Paste Spotify access token"
+                />
+                <button onClick={saveSpotifyToken}>Save Token</button>
+              </div>
+            </div>
+          )}
         </header>
 
         <section>
