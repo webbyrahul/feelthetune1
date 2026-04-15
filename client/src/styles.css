@@ -78,7 +78,6 @@ button.secondary { background: rgba(255, 255, 255, 0.08); }
 
 .dashboard { flex: 1; padding: 1rem 1.2rem; }
 
-
 .layout-shell {
   display: grid;
   grid-template-columns: 220px 1fr;

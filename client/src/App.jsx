@@ -129,7 +129,29 @@ export default function App() {
     const loadArtists = async () => {
       try {
         const fullArtists = await fetchArtistsByIds(artistIds);
-        setArtistDetails(fullArtists);
+        if (fullArtists.length) {
+          setArtistDetails(fullArtists);
+          return;
+        }
+
+        // Fallback when /artists endpoint is restricted: resolve artists via search by name.
+        const names = Array.from(
+          new Set(
+            topAlbums
+              .flatMap((album) => album.artists || [])
+              .map((artist) => artist.name)
+              .filter(Boolean)
+          )
+        ).slice(0, 20);
+
+        const searchedArtists = await Promise.all(
+          names.map(async (name) => {
+            const data = await searchMusic(name);
+            return data.artists?.items?.[0] || null;
+          })
+        );
+
+        setArtistDetails(searchedArtists.filter(Boolean));
       } catch {
         setArtistDetails([]);
       }
@@ -185,8 +207,9 @@ export default function App() {
       setDetailsLoading(true);
       setSelectedView({ type: 'artist', id: artist.id, title: artist.name });
       const tracks = await fetchArtistTopTracks(artist.id);
-      setSelectedTracks(tracks);
-      setCurrentQueue(tracks);
+      const topTracks = tracks.slice(0, 10);
+      setSelectedTracks(topTracks);
+      setCurrentQueue(topTracks);
       setCurrentTrackIndex(-1);
     } catch {
       setSelectedTracks([]);
