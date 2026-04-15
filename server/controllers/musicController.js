@@ -121,10 +121,27 @@ export const getNewReleases = async (req, res, next) => {
 export const getArtistTopTracks = async (req, res, next) => {
   try {
     const { artistId } = req.params;
-    const { market = DEFAULT_MARKET } = req.query;
-    const data = await spotifyRequest(`/artists/${artistId}/top-tracks`, { market });
-    const tracks = await enrichTracksWithPreview(data.tracks || []);
-    res.json({ ...data, tracks });
+    const { market = DEFAULT_MARKET, artistName = '' } = req.query;
+    try {
+      const data = await spotifyRequest(`/artists/${artistId}/top-tracks`, { market });
+      const tracks = await enrichTracksWithPreview(data.tracks || []);
+      return res.json({ ...data, tracks });
+    } catch (error) {
+      if (error.response?.status !== 403) throw error;
+
+      // Fallback for apps where artist top-tracks endpoint is restricted.
+      if (!artistName) {
+        return res.status(200).json({ tracks: [], warning: 'Artist top tracks unavailable for this token/app.' });
+      }
+
+      const fallback = await spotifyRequest('/search', {
+        q: `artist:\"${artistName}\"`,
+        type: 'track',
+        market
+      });
+      const tracks = await enrichTracksWithPreview((fallback.tracks?.items || []).slice(0, 10));
+      return res.json({ tracks, source: 'search-fallback' });
+    }
   } catch (error) {
     next(error);
   }

@@ -206,7 +206,7 @@ export default function App() {
     try {
       setDetailsLoading(true);
       setSelectedView({ type: 'artist', id: artist.id, title: artist.name });
-      const tracks = await fetchArtistTopTracks(artist.id);
+      const tracks = await fetchArtistTopTracks(artist.id, artist.name);
       const topTracks = tracks.slice(0, 10);
       setSelectedTracks(topTracks);
       setCurrentQueue(topTracks);
