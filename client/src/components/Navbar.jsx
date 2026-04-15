@@ -1,4 +1,4 @@
-export default function Navbar({ query, onQueryChange, onSearch, onSignup, onLogin, currentUser }) {
+export default function Navbar({ query, onQueryChange, onSearch, onSignup, onLogin, onLogout, currentUser }) {
   return (
     <nav className="navbar">
       <h1 className="logo">FeelTheTune</h1>
@@ -13,7 +13,12 @@ export default function Navbar({ query, onQueryChange, onSearch, onSignup, onLog
       </div>
       <div className="auth-actions">
         {currentUser ? (
-          <span className="welcome">Hi, {currentUser.name}</span>
+          <>
+            <span className="welcome">Hi, {currentUser.name}</span>
+            <button className="secondary" onClick={onLogout}>
+              Logout
+            </button>
+          </>
         ) : (
           <>
             <button className="secondary" onClick={onSignup}>

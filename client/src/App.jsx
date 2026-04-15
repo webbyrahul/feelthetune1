@@ -107,6 +107,13 @@ export default function App() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('ftt_token');
+    localStorage.removeItem('ftt_user');
+    setCurrentUser(null);
+    setAuthMode('login');
+  };
+
   const topAlbums = useMemo(() => (results?.albums?.items || albums).slice(0, 20), [results, albums]);
 
   useEffect(() => {
@@ -274,6 +281,7 @@ export default function App() {
         onSearch={handleSearch}
         onSignup={() => setAuthMode('signup')}
         onLogin={() => setAuthMode('login')}
+        onLogout={handleLogout}
         currentUser={currentUser}
       />
 
