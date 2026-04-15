@@ -60,8 +60,10 @@ export const fetchAlbumTracks = async (albumId) => {
   return response.data;
 };
 
-export const fetchArtistTopTracks = async (artistId) => {
-  const response = await api.get(`/music/artist-top-tracks/${artistId}`);
+export const fetchArtistTopTracks = async (artistId, artistName = '') => {
+  const response = await api.get(`/music/artist-top-tracks/${artistId}`, {
+    params: { artistName }
+  });
   return response.data.tracks || [];
 };
 
