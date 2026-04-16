@@ -11,9 +11,10 @@ export const fetchRecommendations = async () => {
   return response.data.albums || [];
 };
 
-export const searchMusic = async (query) => {
+export const searchMusic = async (query, options = {}) => {
+  const { type = 'track,album,artist', limit = 20 } = options;
   const response = await api.get('/music/search', {
-    params: { q: query, type: 'track,album,artist', limit: 20 }
+    params: { q: query, type, limit }
   });
   return response.data;
 };

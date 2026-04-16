@@ -184,14 +184,42 @@ export const getArtistsByIds = async (req, res, next) => {
     }
 
     const data = await spotifyRequest('/artists', { ids: idList.join(',') });
-    res.json({ artists: data.artists || [] });
+    const artists = (data.artists || []).filter(Boolean);
+    res.json({ artists });
   } catch (error) {
     if (error.response?.status === 403) {
-      // Some Spotify apps block /artists for client-credentials tokens.
-      return res.status(200).json({
-        artists: [],
-        warning: 'Spotify artists endpoint is restricted for this app/token.'
-      });
+      // Some Spotify apps block /artists batch endpoint. Fallback to per-artist fetch.
+      try {
+        const artists = (
+          await Promise.all(
+            String(req.query.ids)
+              .split(',')
+              .map((id) => id.trim())
+              .filter(Boolean)
+              .slice(0, 50)
+              .map(async (artistId) => {
+                try {
+                  return await spotifyRequest(`/artists/${artistId}`);
+                } catch {
+                  return null;
+                }
+              })
+          )
+        ).filter(Boolean);
+
+        return res.status(200).json({
+          artists,
+          source: 'artist-id-fallback',
+          warning: artists.length
+            ? undefined
+            : 'Spotify artists endpoint is restricted for this app/token.'
+        });
+      } catch {
+        return res.status(200).json({
+          artists: [],
+          warning: 'Spotify artists endpoint is restricted for this app/token.'
+        });
+      }
     }
     next(error);
   }

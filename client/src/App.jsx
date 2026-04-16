@@ -151,14 +151,21 @@ export default function App() {
           )
         ).slice(0, 20);
 
-        const searchedArtists = await Promise.all(
+        const searchedArtists = await Promise.allSettled(
           names.map(async (name) => {
-            const data = await searchMusic(name);
-            return data.artists?.items?.[0] || null;
+            const data = await searchMusic(name, { type: 'artist', limit: 5 });
+            const matched = (data.artists?.items || []).find(
+              (artist) => artist.name?.toLowerCase() === name.toLowerCase()
+            );
+            return matched || data.artists?.items?.[0] || null;
           })
         );
 
-        setArtistDetails(searchedArtists.filter(Boolean));
+        const resolvedArtists = searchedArtists
+          .filter((result) => result.status === 'fulfilled' && result.value)
+          .map((result) => result.value);
+
+        setArtistDetails(resolvedArtists);
       } catch {
         setArtistDetails([]);
       }
