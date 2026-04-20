@@ -7,7 +7,8 @@ const trackSchema = new mongoose.Schema(
     artist: String,
     album: String,
     imageUrl: String,
-    previewUrl: String
+    previewUrl: String,
+    uri: String
   },
   { _id: false }
 );
