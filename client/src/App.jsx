@@ -4,6 +4,8 @@ import MediaCard from './components/MediaCard';
 import HorizontalScroller from './components/HorizontalScroller';
 import Footer from './components/Footer';
 import AuthModal from './components/AuthModal';
+import CreatePlaylistModal from './components/CreatePlaylistModal';
+import AddToPlaylistModal from './components/AddToPlaylistModal';
 import useSpotifyWebPlayback from './hooks/useSpotifyWebPlayback';
 import {
   fetchRecommendations,
@@ -14,7 +16,10 @@ import {
   fetchAlbumTracks,
   fetchArtistTopTracks,
   fetchSpotifyAccessToken,
-  getSpotifyLoginUrl
+  getSpotifyLoginUrl,
+  fetchUserPlaylists,
+  removeTrackFromPlaylist as apiRemoveTrack,
+  deletePlaylist as apiDeletePlaylist
 } from './services/api';
 
 export default function App() {
@@ -39,6 +44,13 @@ export default function App() {
   const [requestedTrack, setRequestedTrack] = useState(null);
   const [spotifyToken, setSpotifyToken] = useState('');
   const [isSpotifyAuthed, setIsSpotifyAuthed] = useState(false);
+
+  // Playlist state
+  const [playlists, setPlaylists] = useState([]);
+  const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
+  const [showAddSongs, setShowAddSongs] = useState(false);
+  const [activePlaylistId, setActivePlaylistId] = useState(null);
+
   const refreshSpotifyToken = async () => {
     const tokenResponse = await fetchSpotifyAccessToken();
     setSpotifyToken(tokenResponse.accessToken);
@@ -78,6 +90,23 @@ export default function App() {
 
     load();
   }, []);
+
+  // Load user playlists
+  useEffect(() => {
+    if (!currentUser) {
+      setPlaylists([]);
+      return;
+    }
+    const loadPlaylists = async () => {
+      try {
+        const data = await fetchUserPlaylists(currentUser._id || currentUser.id);
+        setPlaylists(data);
+      } catch {
+        // silent fail
+      }
+    };
+    loadPlaylists();
+  }, [currentUser]);
 
   const handleSearch = async () => {
     if (!query.trim()) return;
@@ -203,6 +232,7 @@ export default function App() {
   const openAlbumDetails = async (album) => {
     try {
       setDetailsLoading(true);
+      setActivePlaylistId(null);
       setSelectedView({ type: 'album', id: album.id, title: album.name });
       const data = await fetchAlbumTracks(album.id);
       setSelectedTracks(data.tracks || []);
@@ -219,6 +249,7 @@ export default function App() {
   const openArtistDetails = async (artist) => {
     try {
       setDetailsLoading(true);
+      setActivePlaylistId(null);
       setSelectedView({ type: 'artist', id: artist.id, title: artist.name });
       const tracks = await fetchArtistTopTracks(artist.id, artist.name);
       const topTracks = tracks.slice(0, 10);
@@ -231,6 +262,71 @@ export default function App() {
     } finally {
       setDetailsLoading(false);
     }
+  };
+
+  // Playlist handlers
+  const openPlaylistDetails = (playlist) => {
+    setActivePlaylistId(playlist._id);
+    setSelectedView({ type: 'playlist', id: playlist._id, title: playlist.name });
+    // Convert stored tracks to a playable format
+    const tracks = (playlist.tracks || []).map((t) => ({
+      id: t.trackId,
+      name: t.name,
+      artists: [{ name: t.artist || '' }],
+      album: { name: t.album || '', images: t.imageUrl ? [{ url: t.imageUrl }] : [] },
+      duration_ms: null,
+      uri: t.uri || null,
+      preview_url: t.previewUrl || null
+    }));
+    setSelectedTracks(tracks);
+    setCurrentQueue(tracks);
+    setCurrentTrackIndex(-1);
+  };
+
+  const handleRemoveFromPlaylist = async (playlistId, trackId) => {
+    try {
+      const updated = await apiRemoveTrack(playlistId, trackId);
+      setPlaylists((prev) =>
+        prev.map((p) => (p._id === playlistId ? updated : p))
+      );
+      // If currently viewing this playlist, refresh the track list
+      if (activePlaylistId === playlistId) {
+        const tracks = (updated.tracks || []).map((t) => ({
+          id: t.trackId,
+          name: t.name,
+          artists: [{ name: t.artist || '' }],
+          album: { name: t.album || '', images: t.imageUrl ? [{ url: t.imageUrl }] : [] },
+          duration_ms: null,
+          uri: t.uri || null
+        }));
+        setSelectedTracks(tracks);
+        setCurrentQueue(tracks);
+      }
+    } catch {
+      setError('Failed to remove track.');
+    }
+  };
+
+  const handleDeletePlaylist = async (playlistId) => {
+    try {
+      await apiDeletePlaylist(playlistId);
+      setPlaylists((prev) => prev.filter((p) => p._id !== playlistId));
+      if (activePlaylistId === playlistId) {
+        setActivePlaylistId(null);
+        setSelectedView(null);
+        setSelectedTracks([]);
+      }
+    } catch {
+      setError('Failed to delete playlist.');
+    }
+  };
+
+  const handlePlaylistCreated = () => {
+    // Reload playlists from server
+    if (!currentUser) return;
+    fetchUserPlaylists(currentUser._id || currentUser.id)
+      .then(setPlaylists)
+      .catch(() => {});
   };
 
   const findPlayableIndex = (startIndex, direction = 1) => {
@@ -299,6 +395,66 @@ export default function App() {
           <button className="sidebar-item">Albums</button>
           <button className="sidebar-item">Artists</button>
           <button className="sidebar-item">Playlists</button>
+
+          {/* Create Playlist Button */}
+          <div className="sidebar-divider" />
+          <button
+            className="sidebar-create-playlist"
+            onClick={() => {
+              if (!currentUser) {
+                setAuthMode('login');
+                return;
+              }
+              setShowCreatePlaylist(true);
+            }}
+            id="create-playlist-sidebar-btn"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Create Playlist
+          </button>
+
+          {/* User Playlists */}
+          {playlists.length > 0 && (
+            <>
+              <div className="sidebar-divider" />
+              <h3 className="sidebar-playlists-title">Your Playlists</h3>
+              <ul className="sidebar-playlist-list">
+                {playlists.map((pl) => (
+                  <li key={pl._id} className={activePlaylistId === pl._id ? 'active' : ''}>
+                    <button
+                      className="sidebar-playlist-btn"
+                      onClick={() => openPlaylistDetails(pl)}
+                      title={pl.name}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M9 18V5l12-2v13" />
+                        <circle cx="6" cy="18" r="3" />
+                        <circle cx="18" cy="16" r="3" />
+                      </svg>
+                      <span>{pl.name}</span>
+                      <small className="playlist-count">{pl.tracks?.length || 0}</small>
+                    </button>
+                    <button
+                      className="sidebar-playlist-delete"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeletePlaylist(pl._id);
+                      }}
+                      title="Delete playlist"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </aside>
 
         <section className="main-panel">
@@ -348,9 +504,29 @@ export default function App() {
 
         {selectedView && (
           <section className="details-panel">
-            <h3>
-              {selectedView.type === 'album' ? 'Album Songs' : 'Artist Top Songs'} · {selectedView.title}
-            </h3>
+            <div className="details-panel-header">
+              <h3>
+                {selectedView.type === 'album'
+                  ? 'Album Songs'
+                  : selectedView.type === 'artist'
+                  ? 'Artist Top Songs'
+                  : 'Playlist'}{' '}
+                · {selectedView.title}
+              </h3>
+              {selectedView.type === 'playlist' && (
+                <button
+                  className="add-songs-btn"
+                  onClick={() => setShowAddSongs(true)}
+                  id="add-songs-to-playlist-btn"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  Add Songs
+                </button>
+              )}
+            </div>
             {detailsLoading ? (
               <p>Loading songs...</p>
             ) : selectedTracks.length ? (
@@ -358,7 +534,7 @@ export default function App() {
                 <div className="track-head">
                   <span>#</span>
                   <span>Song</span>
-                  <span>Duration</span>
+                  <span>{selectedView.type === 'playlist' ? '' : 'Duration'}</span>
                 </div>
                 <ul className="track-list">
                   {selectedTracks.map((track, index) => (
@@ -372,13 +548,29 @@ export default function App() {
                         <span>{track.name}</span>
                         <small>{(track.artists || []).map((artist) => artist.name).join(', ')}</small>
                       </div>
-                      <small>
-                        {!track.uri
-                          ? 'Unavailable'
-                          : track.duration_ms
-                          ? `${Math.floor(track.duration_ms / 60000)}:${String(Math.floor((track.duration_ms % 60000) / 1000)).padStart(2, '0')}`
-                          : ''}
-                      </small>
+                      {selectedView.type === 'playlist' ? (
+                        <button
+                          className="track-remove-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveFromPlaylist(selectedView.id, track.id);
+                          }}
+                          title="Remove from playlist"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      ) : (
+                        <small>
+                          {!track.uri
+                            ? 'Unavailable'
+                            : track.duration_ms
+                            ? `${Math.floor(track.duration_ms / 60000)}:${String(Math.floor((track.duration_ms % 60000) / 1000)).padStart(2, '0')}`
+                            : ''}
+                        </small>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -443,6 +635,34 @@ export default function App() {
           onSubmit={handleAuth}
           loading={authLoading}
           error={authError}
+        />
+      )}
+
+      {showCreatePlaylist && (
+        <CreatePlaylistModal
+          onClose={() => setShowCreatePlaylist(false)}
+          currentUser={currentUser}
+          onPlaylistCreated={handlePlaylistCreated}
+        />
+      )}
+
+      {showAddSongs && activePlaylistId && (
+        <AddToPlaylistModal
+          onClose={() => setShowAddSongs(false)}
+          playlistId={activePlaylistId}
+          playlistName={selectedView?.title || 'Playlist'}
+          existingTrackIds={selectedTracks.map((t) => t.id)}
+          onTracksAdded={() => {
+            // Reload playlists and refresh the current view
+            if (!currentUser) return;
+            fetchUserPlaylists(currentUser._id || currentUser.id)
+              .then((data) => {
+                setPlaylists(data);
+                const updated = data.find((p) => p._id === activePlaylistId);
+                if (updated) openPlaylistDetails(updated);
+              })
+              .catch(() => {});
+          }}
         />
       )}
     </div>

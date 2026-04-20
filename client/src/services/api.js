@@ -39,6 +39,21 @@ export const addTrackToPlaylist = async (playlistId, payload) => {
   return response.data;
 };
 
+export const fetchUserPlaylists = async (userId) => {
+  const response = await api.get(`/playlists/${userId}`);
+  return response.data;
+};
+
+export const removeTrackFromPlaylist = async (playlistId, trackId) => {
+  const response = await api.delete(`/playlists/${playlistId}/tracks/${trackId}`);
+  return response.data;
+};
+
+export const deletePlaylist = async (playlistId) => {
+  const response = await api.delete(`/playlists/${playlistId}`);
+  return response.data;
+};
+
 export const signup = async (payload) => {
   const response = await api.post('/auth/signup', payload);
   return response.data;
