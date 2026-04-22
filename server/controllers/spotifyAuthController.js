@@ -15,7 +15,9 @@ export const spotifyLogin = (_req, res) => {
     'user-read-email',
     'user-read-private',
     'user-modify-playback-state',
-    'user-read-playback-state'
+    'user-read-playback-state',
+    'user-read-recently-played',
+    'user-top-read'
   ].join(' ');
 
   const authUrl = new URL('https://accounts.spotify.com/authorize');

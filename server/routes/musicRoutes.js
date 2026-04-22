@@ -7,6 +7,7 @@ const missingHandler = (_req, res) =>
   res.status(501).json({ message: 'Endpoint temporarily unavailable. Please update the server code.' });
 
 router.get('/recommendations', musicController.getRecommendations || missingHandler);
+router.get('/personalized-recommendations', musicController.getPersonalizedRecommendations || missingHandler);
 router.get('/search', musicController.searchMusic || missingHandler);
 router.get('/new-releases', musicController.getNewReleases || missingHandler);
 router.get('/artist-top-tracks/:artistId', musicController.getArtistTopTracks || missingHandler);
