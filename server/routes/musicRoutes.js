@@ -13,5 +13,6 @@ router.get('/new-releases', musicController.getNewReleases || missingHandler);
 router.get('/artist-top-tracks/:artistId', musicController.getArtistTopTracks || missingHandler);
 router.get('/album-tracks/:albumId', musicController.getAlbumTracks || missingHandler);
 router.get('/artists', musicController.getArtistsByIds || missingHandler);
+router.get('/recently-played', musicController.getRecentlyPlayed || missingHandler);
 
 export default router;

@@ -418,3 +418,54 @@ export const getPersonalizedRecommendations = async (_req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Fetch user's recently played tracks from Spotify.
+ * Requires a valid user OAuth token.
+ */
+export const getRecentlyPlayed = async (_req, res, next) => {
+  try {
+    if (!hasValidAccessToken()) {
+      try {
+        await refreshSpotifyToken();
+      } catch {
+        return res.status(401).json({ message: 'Spotify login required for recently played.' });
+      }
+    }
+
+    const { accessToken } = getSpotifyTokens();
+    if (!accessToken) {
+      return res.status(401).json({ message: 'Spotify login required.' });
+    }
+
+    const response = await axios.get('https://api.spotify.com/v1/me/player/recently-played', {
+      params: { limit: 30 },
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+
+    const items = response.data.items || [];
+
+    // Deduplicate by track id, keeping first (most recent) occurrence
+    const seen = new Set();
+    const tracks = [];
+    for (const item of items) {
+      const track = item.track;
+      if (track && !seen.has(track.id)) {
+        seen.add(track.id);
+        tracks.push({
+          id: track.id,
+          name: track.name,
+          uri: track.uri,
+          artists: track.artists || [],
+          album: track.album || {},
+          duration_ms: track.duration_ms,
+          played_at: item.played_at
+        });
+      }
+    }
+
+    return res.json({ tracks });
+  } catch (error) {
+    next(error);
+  }
+};
