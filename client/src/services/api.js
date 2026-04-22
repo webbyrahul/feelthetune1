@@ -93,4 +93,9 @@ export const fetchSpotifyAccessToken = async () => {
   return response.data;
 };
 
+export const fetchRecentlyPlayed = async () => {
+  const response = await api.get('/music/recently-played');
+  return response.data.tracks || [];
+};
+
 export const getSpotifyLoginUrl = () => `${API_BASE_URL}/spotify/login`;

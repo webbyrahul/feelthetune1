@@ -20,7 +20,8 @@ import {
   getSpotifyLoginUrl,
   fetchUserPlaylists,
   removeTrackFromPlaylist as apiRemoveTrack,
-  deletePlaylist as apiDeletePlaylist
+  deletePlaylist as apiDeletePlaylist,
+  fetchRecentlyPlayed
 } from './services/api';
 
 export default function App() {
@@ -52,6 +53,10 @@ export default function App() {
   const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
   const [showAddSongs, setShowAddSongs] = useState(false);
   const [activePlaylistId, setActivePlaylistId] = useState(null);
+
+  // Recently played
+  const [recentlyPlayed, setRecentlyPlayed] = useState([]);
+  const [showAllRecent, setShowAllRecent] = useState(false);
 
   const refreshSpotifyToken = async () => {
     const tokenResponse = await fetchSpotifyAccessToken();
@@ -116,6 +121,23 @@ export default function App() {
     return () => {
       cancelled = true;
     };
+  }, [isSpotifyAuthed]);
+
+  // Load recently played tracks
+  useEffect(() => {
+    if (!isSpotifyAuthed) {
+      setRecentlyPlayed([]);
+      return;
+    }
+    const loadRecent = async () => {
+      try {
+        const tracks = await fetchRecentlyPlayed();
+        setRecentlyPlayed(tracks);
+      } catch {
+        // silent fail
+      }
+    };
+    loadRecent();
   }, [isSpotifyAuthed]);
 
   // Load user playlists
@@ -417,77 +439,131 @@ export default function App() {
 
       <main className="dashboard layout-shell">
         <aside className="sidebar">
-          <h3>Browse</h3>
-          <button className="sidebar-item active">Home</button>
-          <button className="sidebar-item">Albums</button>
-          <button className="sidebar-item">Artists</button>
-          <button className="sidebar-item">Playlists</button>
-
-          {/* Create Playlist Button */}
-          <div className="sidebar-divider" />
-          <button
-            className="sidebar-create-playlist"
-            onClick={() => {
-              if (!currentUser) {
-                setAuthMode('login');
-                return;
-              }
-              setShowCreatePlaylist(true);
-            }}
-            id="create-playlist-sidebar-btn"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Create Playlist
-          </button>
-
-          {/* User Playlists */}
-          {playlists.length > 0 && (
+          <h3>Recently Played</h3>
+          {recentlyPlayed.length > 0 ? (
             <>
-              <div className="sidebar-divider" />
+              <ul className="sidebar-recent-list" id="recently-played-list">
+                {recentlyPlayed.slice(0, showAllRecent ? 6 : 3).map((track) => (
+                  <li
+                    key={track.id}
+                    className="sidebar-recent-item"
+                    onClick={() => {
+                      setCurrentQueue(recentlyPlayed);
+                      const idx = recentlyPlayed.findIndex((t) => t.id === track.id);
+                      playTrackAtIndex(idx >= 0 ? idx : 0);
+                    }}
+                    title={`${track.name} — ${(track.artists || []).map((a) => a.name).join(', ')}`}
+                  >
+                    <img
+                      src={track.album?.images?.[2]?.url || track.album?.images?.[0]?.url || 'https://via.placeholder.com/40'}
+                      alt={track.name}
+                    />
+                    <div className="sidebar-recent-info">
+                      <span>{track.name}</span>
+                      <small>{(track.artists || []).map((a) => a.name).join(', ')}</small>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {recentlyPlayed.length > 3 && (
+                <button
+                  className="sidebar-see-more"
+                  onClick={() => setShowAllRecent((prev) => !prev)}
+                  id="see-more-recent-btn"
+                >
+                  {showAllRecent ? 'See less' : 'See more'}
+                </button>
+              )}
+            </>
+          ) : (
+            <p className="sidebar-recent-empty">
+              {isSpotifyAuthed ? 'No recent songs yet.' : 'Login with Spotify to see history.'}
+            </p>
+          )}
+
+          {/* Playlist Section */}
+          <div className="sidebar-divider" />
+          <div className="sidebar-playlist-section">
+            <div className="sidebar-playlist-header">
               <h3 className="sidebar-playlists-title">Your Playlists</h3>
-              <ul className="sidebar-playlist-list">
+              <button
+                className="sidebar-create-playlist-icon"
+                onClick={() => {
+                  if (!currentUser) {
+                    setAuthMode('login');
+                    return;
+                  }
+                  setShowCreatePlaylist(true);
+                }}
+                id="create-playlist-sidebar-btn"
+                title="Create Playlist"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
+            </div>
+            {playlists.length > 0 ? (
+              <div
+                className="sidebar-playlist-scroller"
+                onMouseDown={(e) => {
+                  const el = e.currentTarget;
+                  el.dataset.dragging = 'true';
+                  el.dataset.startX = e.pageX;
+                  el.dataset.scrollStart = el.scrollLeft;
+                }}
+                onMouseMove={(e) => {
+                  const el = e.currentTarget;
+                  if (el.dataset.dragging !== 'true') return;
+                  e.preventDefault();
+                  const dx = e.pageX - Number(el.dataset.startX);
+                  el.scrollLeft = Number(el.dataset.scrollStart) - dx;
+                }}
+                onMouseUp={(e) => { e.currentTarget.dataset.dragging = 'false'; }}
+                onMouseLeave={(e) => { e.currentTarget.dataset.dragging = 'false'; }}
+              >
                 {playlists.map((pl) => (
-                  <li key={pl._id} className={activePlaylistId === pl._id ? 'active' : ''}>
+                  <div
+                    key={pl._id}
+                    className={`sidebar-playlist-card${activePlaylistId === pl._id ? ' active' : ''}`}
+                    onClick={() => openPlaylistDetails(pl)}
+                    title={pl.name}
+                  >
                     <button
-                      className="sidebar-playlist-btn"
-                      onClick={() => openPlaylistDetails(pl)}
-                      title={pl.name}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M9 18V5l12-2v13" />
-                        <circle cx="6" cy="18" r="3" />
-                        <circle cx="18" cy="16" r="3" />
-                      </svg>
-                      <span>{pl.name}</span>
-                      <small className="playlist-count">{pl.tracks?.length || 0}</small>
-                    </button>
-                    <button
-                      className="sidebar-playlist-delete"
+                      className="sidebar-playlist-card-delete"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDeletePlaylist(pl._id);
                       }}
                       title="Delete playlist"
                     >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                         <line x1="18" y1="6" x2="6" y2="18" />
                         <line x1="6" y1="6" x2="18" y2="18" />
                       </svg>
                     </button>
-                  </li>
+                    <div className="sidebar-playlist-card-icon">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <path d="M9 18V5l12-2v13" />
+                        <circle cx="6" cy="18" r="3" />
+                        <circle cx="18" cy="16" r="3" />
+                      </svg>
+                    </div>
+                    <span className="sidebar-playlist-card-name">{pl.name}</span>
+                    <small className="sidebar-playlist-card-count">{pl.tracks?.length || 0} songs</small>
+                  </div>
                 ))}
-              </ul>
-            </>
-          )}
+              </div>
+            ) : (
+              <p className="sidebar-recent-empty">No playlists yet. Create one!</p>
+            )}
+          </div>
         </aside>
 
         <section className="main-panel">
         <header>
-          <h2>{isSpotifyAuthed && recommendedTracks.length ? '🎧 Recommended For You' : 'Recommended Music'}</h2>
-          <p>{isSpotifyAuthed && recommendedTracks.length ? 'Based on your listening history.' : 'Drag horizontally to explore albums and artists.'}</p>
+
           {(error || playerError) && <p className="error">{error || playerError}</p>}
           {!isSpotifyAuthed && (
             <div className="token-box">
