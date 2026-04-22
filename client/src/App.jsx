@@ -9,6 +9,7 @@ import AddToPlaylistModal from './components/AddToPlaylistModal';
 import useSpotifyWebPlayback from './hooks/useSpotifyWebPlayback';
 import {
   fetchRecommendations,
+  fetchPersonalizedRecommendations,
   searchMusic,
   signup,
   login,
@@ -24,6 +25,7 @@ import {
 
 export default function App() {
   const [albums, setAlbums] = useState([]);
+  const [recommendedTracks, setRecommendedTracks] = useState([]);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null);
   const [error, setError] = useState('');
@@ -79,17 +81,42 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
     const load = async () => {
       try {
+        // Try personalized recommendations first when Spotify is authed
+        if (isSpotifyAuthed) {
+          try {
+            const personalData = await fetchPersonalizedRecommendations();
+            if (cancelled) return;
+            if (personalData.albums?.length) {
+              setAlbums(personalData.albums);
+              setRecommendedTracks(personalData.tracks || []);
+              return;
+            }
+          } catch {
+            if (cancelled) return;
+            // Fall through to generic recommendations
+          }
+        }
+        // Generic fallback
         const data = await fetchRecommendations();
+        if (cancelled) return;
         setAlbums(data);
+        setRecommendedTracks([]);
       } catch {
+        if (cancelled) return;
         setError('Unable to load recommendations. Check backend and Spotify credentials.');
       }
     };
 
     load();
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isSpotifyAuthed]);
 
   // Load user playlists
   useEffect(() => {
@@ -459,18 +486,39 @@ export default function App() {
 
         <section className="main-panel">
         <header>
-          <h2>Recommended Music</h2>
-          <p>Drag horizontally to explore albums and artists.</p>
+          <h2>{isSpotifyAuthed && recommendedTracks.length ? '🎧 Recommended For You' : 'Recommended Music'}</h2>
+          <p>{isSpotifyAuthed && recommendedTracks.length ? 'Based on your listening history.' : 'Drag horizontally to explore albums and artists.'}</p>
           {(error || playerError) && <p className="error">{error || playerError}</p>}
           {!isSpotifyAuthed && (
             <div className="token-box">
-              <p>Login with Spotify to enable Web Playback SDK.</p>
+              <p>Login with Spotify to enable Web Playback SDK and personalized recommendations.</p>
               <div className="token-row">
                 <button onClick={() => (window.location.href = getSpotifyLoginUrl())}>Login with Spotify</button>
               </div>
             </div>
           )}
         </header>
+
+        {recommendedTracks.length > 0 && (
+          <section>
+            <h3>Recommended Tracks</h3>
+            <HorizontalScroller>
+              {recommendedTracks.map((track) => (
+                <MediaCard
+                  key={track.id}
+                  title={track.name}
+                  subtitle={(track.artists || []).map((a) => a.name).join(', ')}
+                  image={track.album?.images?.[1]?.url || track.album?.images?.[0]?.url || 'https://via.placeholder.com/240'}
+                  onClick={() => {
+                    setCurrentQueue(recommendedTracks);
+                    const idx = recommendedTracks.findIndex((t) => t.id === track.id);
+                    playTrackAtIndex(idx >= 0 ? idx : 0);
+                  }}
+                />
+              ))}
+            </HorizontalScroller>
+          </section>
+        )}
 
         <section>
           <h3>Albums</h3>

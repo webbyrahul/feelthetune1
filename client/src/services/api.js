@@ -11,6 +11,11 @@ export const fetchRecommendations = async () => {
   return response.data.albums || [];
 };
 
+export const fetchPersonalizedRecommendations = async () => {
+  const response = await api.get('/music/personalized-recommendations');
+  return response.data;
+};
+
 export const searchMusic = async (query, options = {}) => {
   const { type = 'track,album,artist', limit = 20 } = options;
   const response = await api.get('/music/search', {
