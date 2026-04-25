@@ -17,7 +17,9 @@ export const spotifyLogin = (_req, res) => {
     'user-modify-playback-state',
     'user-read-playback-state',
     'user-read-recently-played',
-    'user-top-read'
+    'user-top-read',
+    'playlist-modify-public',
+    'playlist-modify-private'
   ].join(' ');
 
   const authUrl = new URL('https://accounts.spotify.com/authorize');
@@ -25,6 +27,7 @@ export const spotifyLogin = (_req, res) => {
   authUrl.searchParams.set('client_id', process.env.SPOTIFY_CLIENT_ID || '');
   authUrl.searchParams.set('scope', scopes);
   authUrl.searchParams.set('redirect_uri', redirectUri());
+  authUrl.searchParams.set('show_dialog', 'true');
 
   return res.redirect(authUrl.toString());
 };

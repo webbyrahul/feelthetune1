@@ -2,6 +2,7 @@ import axios from 'axios';
 import { spotifyRequest } from '../services/spotifyService.js';
 import { getSpotifyTokens, hasValidAccessToken } from '../services/spotifyOAuthStore.js';
 import { refreshSpotifyToken } from './spotifyAuthController.js';
+import { parsePlaylistPrompt } from '../services/llmParserService.js';
 
 const sanitizeLimit = (value, fallback = 20, max = 20) => {
   const parsed = Number.parseInt(value, 10);
@@ -467,5 +468,286 @@ export const getRecentlyPlayed = async (_req, res, next) => {
     return res.json({ tracks });
   } catch (error) {
     next(error);
+  }
+};
+
+/**
+ * AI Playlist Generation Logic
+ */
+export const generateAiPlaylist = async (req, res, next) => {
+  try {
+    if (!hasValidAccessToken()) {
+      try {
+        await refreshSpotifyToken();
+      } catch {
+        return res.status(401).json({ message: 'Spotify login required to generate playlist.' });
+      }
+    }
+
+    const { accessToken } = getSpotifyTokens();
+    let { genre, artists, yearRange, mood, length = 20, prompt } = req.body;
+
+    if (prompt) {
+      try {
+        const parsed = await parsePlaylistPrompt(prompt);
+        genre = parsed.genre;
+        artists = parsed.artists;
+        yearRange = parsed.yearRange;
+        mood = parsed.mood;
+        length = parsed.length || length;
+      } catch (err) {
+        return res.status(400).json({ message: err.message });
+      }
+    }
+
+    // 1. Resolve artist IDs
+    const seedArtists = [];
+    if (artists && artists.length > 0) {
+      for (const artistName of artists.slice(0, 3)) { // max 3 artists for seeds
+        try {
+          const artistRes = await axios.get('https://api.spotify.com/v1/search', {
+            params: { q: artistName, type: 'artist', limit: 1 },
+            headers: { Authorization: `Bearer ${accessToken}` }
+          });
+          if (artistRes.data.artists.items.length > 0) {
+            seedArtists.push(artistRes.data.artists.items[0].id);
+          }
+        } catch (e) {
+          console.error(`Failed to resolve artist ${artistName}`, e.message);
+        }
+      }
+    }
+
+    // 2. Map mood to valence/energy
+    const targetFeatures = {};
+    if (mood) {
+      const m = mood.toLowerCase();
+      if (m === 'relaxing') { targetFeatures.target_valence = 0.5; targetFeatures.target_energy = 0.2; }
+      else if (m === 'sad') { targetFeatures.target_valence = 0.1; targetFeatures.target_energy = 0.2; }
+      else if (m === 'romantic') { targetFeatures.target_valence = 0.6; targetFeatures.target_energy = 0.4; }
+      else if (m === 'party') { targetFeatures.target_valence = 0.8; targetFeatures.target_energy = 0.8; targetFeatures.target_danceability = 0.8; }
+      else if (m === 'nostalgic') { targetFeatures.target_valence = 0.5; targetFeatures.target_energy = 0.4; }
+      else if (m === 'focus') { targetFeatures.target_valence = 0.5; targetFeatures.target_energy = 0.2; targetFeatures.target_instrumentalness = 0.8; }
+    }
+
+    // 3. Fetch Recommendations or Search (Hybrid approach)
+    let fetchedTracks = [];
+
+    // Approach A: Recommendations
+    try {
+      const recParams = {
+        limit: Math.min(length * 2, 50) || 50, // Fetch more to filter later, max 50
+        ...targetFeatures
+      };
+      if (seedArtists.length > 0) recParams.seed_artists = seedArtists.join(',');
+      
+      // Try to clean genre for Spotify. If it fails, we fall back.
+      if (genre) {
+         recParams.seed_genres = genre.toLowerCase().replace(/[^a-z0-9\-]/g, '');
+      }
+
+      // Only call recommendations if we have seeds
+      if (recParams.seed_artists || recParams.seed_genres) {
+        const recRes = await axios.get('https://api.spotify.com/v1/recommendations', {
+          params: recParams,
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        fetchedTracks = recRes.data.tracks || [];
+      }
+    } catch (e) {
+      // 404 implies seed_genres was invalid. We ignore and fall back to search.
+      if (e.response?.status !== 404) {
+        console.log('Recommendations failed', e.response?.data?.error?.message || e.message);
+      }
+    }
+
+    // Approach B: Search fallback/hybrid
+    if (fetchedTracks.length < length * 2) {
+      // Build a robust, simple text query instead of strict field filters to avoid 400 errors
+      let q = `${genre || ''} ${artists && artists.length > 0 ? artists[0] : ''}`.trim();
+      
+      // If user provided year, append the year filter
+      if (yearRange) {
+        const [start, end] = yearRange.split('-').map(s => s.trim());
+        if (start && end) {
+          q += ` year:${start}-${end}`;
+        }
+      }
+      
+      q = q.trim();
+      
+      if (q) {
+        try {
+          const searchRes = await axios.get('https://api.spotify.com/v1/search', {
+            params: { q, type: 'track' },
+            headers: { Authorization: `Bearer ${accessToken}` }
+          });
+          fetchedTracks = [...fetchedTracks, ...(searchRes.data.tracks?.items || [])];
+        } catch (e) {
+          console.error('Search fallback failed', e.response?.data?.error?.message || e.message);
+        }
+      }
+      
+      // Approach C: Direct Artist Top Tracks
+      for (const artistId of seedArtists) {
+        try {
+          const topRes = await axios.get(`https://api.spotify.com/v1/artists/${artistId}/top-tracks?market=${DEFAULT_MARKET}`, {
+            headers: { Authorization: `Bearer ${accessToken}` }
+          });
+          fetchedTracks = [...fetchedTracks, ...(topRes.data.tracks || [])];
+        } catch (e) {
+          // 403 can happen if market is not allowed for this user/token, safely ignore
+        }
+      }
+    }
+
+    // 4. Deduplicate & Filter by Year Range
+    const seenIds = new Set();
+    let validTracks = [];
+    
+    let startYear = 0, endYear = 9999;
+    if (yearRange && yearRange.includes('-')) {
+      const [s, e] = yearRange.split('-').map(str => parseInt(str.trim(), 10));
+      if (!isNaN(s)) startYear = s;
+      if (!isNaN(e)) endYear = e;
+    }
+
+    for (const track of fetchedTracks) {
+      if (!track || !track.id) continue;
+      if (seenIds.has(track.id)) continue;
+      
+      // Filter year
+      if (track.album && track.album.release_date) {
+        const trackYear = parseInt(track.album.release_date.split('-')[0], 10);
+        if (trackYear < startYear || trackYear > endYear) continue; 
+      }
+      
+      seenIds.add(track.id);
+      validTracks.push(track);
+    }
+
+    // If still too few, relax year filter
+    let warning = null;
+    if (validTracks.length < length) {
+      warning = "Could not find enough tracks matching all criteria exactly. Expanded search applied.";
+      for (const track of fetchedTracks) {
+        if (!track || !track.id || seenIds.has(track.id)) continue;
+        seenIds.add(track.id);
+        validTracks.push(track);
+        if (validTracks.length >= length) break;
+      }
+    }
+
+    // Shuffle and slice
+    validTracks = validTracks.sort(() => 0.5 - Math.random()).slice(0, length);
+
+    // 5. Generate Title
+    const adjectives = {
+      'relaxing': ['Calm', 'Soothing', 'Mellow', 'Peaceful'],
+      'sad': ['Melancholy', 'Heartbreak', 'Tearjerker', 'Blue'],
+      'romantic': ['Love', 'Sweet', 'Intimate', 'Passionate'],
+      'party': ['Upbeat', 'Hype', 'Energetic', 'Dance'],
+      'nostalgic': ['Throwback', 'Classic', 'Memories of', 'Vintage'],
+      'focus': ['Deep Focus', 'Study', 'Concentration', 'Flow']
+    };
+    
+    let title = 'AI Generated Playlist';
+    const cGenre = genre ? (genre.charAt(0).toUpperCase() + genre.slice(1)) : '';
+    if (genre && mood) {
+      const adjs = adjectives[mood.toLowerCase()] || [mood.charAt(0).toUpperCase() + mood.slice(1)];
+      const adj = adjs[Math.floor(Math.random() * adjs.length)];
+      title = `${adj} ${cGenre} Mix`;
+    } else if (genre) {
+      const prefixes = ['Ultimate', 'Essential', 'Best of', 'Timeless'];
+      const pref = prefixes[Math.floor(Math.random() * prefixes.length)];
+      title = `${pref} ${cGenre}`;
+    } else if (mood) {
+      const m = mood.charAt(0).toUpperCase() + mood.slice(1);
+      title = `${m} Vibes`;
+    } else if (artists && artists.length > 0) {
+      title = `${artists[0]} & More`;
+    }
+
+    res.json({
+      title,
+      tracks: validTracks,
+      warning: validTracks.length < length ? `Found only ${validTracks.length} tracks.` : warning
+    });
+
+  } catch (error) {
+    console.error('generateAiPlaylist error:', error);
+    next(error);
+  }
+};
+
+export const saveToSpotify = async (req, res, next) => {
+  try {
+    if (!hasValidAccessToken()) {
+      try {
+        await refreshSpotifyToken();
+      } catch {
+        return res.status(401).json({ message: 'Spotify login required to save playlist.' });
+      }
+    }
+
+    const { accessToken } = getSpotifyTokens();
+    const { title, trackUris } = req.body;
+
+    if (!title || !trackUris || !Array.isArray(trackUris)) {
+      return res.status(400).json({ message: 'Missing title or track URIs' });
+    }
+
+    // 1. Get user profile and check scopes
+    const meRes = await axios.get('https://api.spotify.com/v1/me', {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    
+    console.log('Token Scopes from Spotify:', meRes.headers['x-oauth-scopes']);
+    
+    const userId = meRes.data.id;
+
+    // 2. Create playlist
+    let playlistId;
+    let createRes;
+    try {
+      createRes = await axios.post(`https://api.spotify.com/v1/users/${userId}/playlists`, {
+        name: title,
+        description: 'Generated by FeelTheTune AI',
+        public: true
+      }, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      playlistId = createRes.data.id;
+    } catch (e) {
+      console.error('Failed at Create Playlist:', e.response?.data || e.message);
+      throw e;
+    }
+
+    // 3. Add tracks in batches of 100
+    const validUris = trackUris.filter(uri => uri && uri.startsWith('spotify:track:'));
+    if (validUris.length === 0) {
+      return res.status(400).json({ message: 'No valid Spotify track URIs found to save.' });
+    }
+
+    try {
+      for (let i = 0; i < validUris.length; i += 100) {
+        const batch = validUris.slice(i, i + 100);
+        await axios.post(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+          uris: batch
+        }, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+      }
+    } catch (e) {
+      console.error('Failed at Add Tracks:', e.response?.data || e.message);
+      throw e;
+    }
+
+    res.json({ success: true, playlistId, externalUrl: createRes.data.external_urls.spotify });
+  } catch (error) {
+    if (error.response?.status === 403) {
+      return res.status(403).json({ message: 'Insufficient Spotify permissions. Please log out and log in again.', details: error.response?.data });
+    }
+    res.status(500).json({ message: 'Failed to save playlist to Spotify' });
   }
 };

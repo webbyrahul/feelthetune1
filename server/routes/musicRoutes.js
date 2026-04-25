@@ -14,5 +14,7 @@ router.get('/artist-top-tracks/:artistId', musicController.getArtistTopTracks ||
 router.get('/album-tracks/:albumId', musicController.getAlbumTracks || missingHandler);
 router.get('/artists', musicController.getArtistsByIds || missingHandler);
 router.get('/recently-played', musicController.getRecentlyPlayed || missingHandler);
+router.post('/generate-playlist', musicController.generateAiPlaylist || missingHandler);
+router.post('/save-to-spotify', musicController.saveToSpotify || missingHandler);
 
 export default router;
