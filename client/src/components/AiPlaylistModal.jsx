@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { generateAiPlaylist, saveToSpotifyPlaylist } from '../services/api';
+import { generateAiPlaylist, createPlaylist, addTrackToPlaylist } from '../services/api';
 
 const SUGGESTIONS = [
   "Late-night ghazals for relaxing",
@@ -8,7 +8,7 @@ const SUGGESTIONS = [
   "Rainy day indie vibes"
 ];
 
-export default function AiPlaylistModal({ onClose, isSpotifyAuthed }) {
+export default function AiPlaylistModal({ onClose, isSpotifyAuthed, currentUser, onPlaylistSaved }) {
   const [step, setStep] = useState('input'); // 'input' | 'results'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -27,7 +27,7 @@ export default function AiPlaylistModal({ onClose, isSpotifyAuthed }) {
 
   const [generatedData, setGeneratedData] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [savedUrl, setSavedUrl] = useState('');
+  const [saved, setSaved] = useState(false);
 
   const handleGenerate = async (e, skipYear = false) => {
     if (e) e.preventDefault();
@@ -39,16 +39,16 @@ export default function AiPlaylistModal({ onClose, isSpotifyAuthed }) {
     setLoading(true);
     setError('');
     setWarning('');
-    setSavedUrl('');
+    setSaved(false);
 
     try {
       const payload = {
-        prompt: prompt.trim(), // LLM handles this if present
+        prompt: prompt.trim(),
         genre,
         artists: artists.split(',').map((a) => a.trim()).filter(Boolean),
         yearRange: skipYear ? '' : yearRange,
         mood,
-        length: Number(length)
+        length: Math.max(Number(length), 15) // Ensure at least 15 songs requested
       };
 
       const data = await generateAiPlaylist(payload);
@@ -67,9 +67,65 @@ export default function AiPlaylistModal({ onClose, isSpotifyAuthed }) {
     }
   };
 
-  const handleSave = async () => {
-    if (!isSpotifyAuthed) {
-      setError('You must be logged in with Spotify to save playlists.');
+  // Remove a track from the generated list before saving
+  const handleRemoveTrack = (index) => {
+    if (!generatedData) return;
+    const updated = generatedData.tracks.filter((_, i) => i !== index);
+    setGeneratedData({ ...generatedData, tracks: updated });
+  };
+
+  // Shuffle: re-fetch from backend to get fresh songs, keeping ~50% of current tracks
+  const handleShuffle = async () => {
+    if (!generatedData || loading) return;
+    setLoading(true);
+    setError('');
+
+    try {
+      const payload = {
+        prompt: prompt.trim(),
+        genre,
+        artists: artists.split(',').map((a) => a.trim()).filter(Boolean),
+        yearRange,
+        mood,
+        length: Math.max(Number(length), 15)
+      };
+
+      const freshData = await generateAiPlaylist(payload);
+      
+      if (!freshData.tracks || freshData.tracks.length === 0) {
+        // If re-fetch fails, just do a simple reorder as fallback
+        const shuffled = [...generatedData.tracks].sort(() => Math.random() - 0.5);
+        setGeneratedData({ ...generatedData, tracks: shuffled });
+        return;
+      }
+
+      // Keep ~50% of old tracks, replace the rest with new ones
+      const currentIds = new Set(generatedData.tracks.map(t => t.id));
+      const newTracks = freshData.tracks.filter(t => !currentIds.has(t.id));
+      
+      const halfCount = Math.ceil(generatedData.tracks.length / 2);
+      const kept = generatedData.tracks.slice(0, halfCount);
+      const replacements = newTracks.slice(0, generatedData.tracks.length - halfCount);
+      
+      // Combine kept + new, then shuffle the order
+      const combined = [...kept, ...replacements].sort(() => Math.random() - 0.5);
+      
+      setGeneratedData({
+        ...generatedData,
+        tracks: combined.length > 0 ? combined : freshData.tracks
+      });
+    } catch {
+      // Fallback: just reorder existing tracks
+      const shuffled = [...generatedData.tracks].sort(() => Math.random() - 0.5);
+      setGeneratedData({ ...generatedData, tracks: shuffled });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveToLocalPlaylist = async () => {
+    if (!currentUser) {
+      setError('You must be logged in to save playlists.');
       return;
     }
     
@@ -77,35 +133,42 @@ export default function AiPlaylistModal({ onClose, isSpotifyAuthed }) {
     setError('');
     
     try {
-      const res = await saveToSpotifyPlaylist({
-        title: generatedData.title,
-        trackUris: generatedData.tracks.map(t => t.uri)
+      const userId = currentUser._id || currentUser.id;
+      
+      // 1. Create a new local playlist in MongoDB
+      const newPlaylist = await createPlaylist({
+        userId,
+        name: generatedData.title || 'AI Generated Playlist',
+        description: `AI playlist: ${prompt || 'Custom mix'}`
       });
-      if (res.success) {
-        setSavedUrl(res.externalUrl);
-      }
-    } catch (err) {
-      if (err.response?.status === 403) {
-        let detailMsg = '';
+      
+      // 2. Add each track to the local playlist
+      for (const track of generatedData.tracks) {
         try {
-          detailMsg = typeof err.response?.data?.details === 'string' 
-            ? err.response?.data?.details 
-            : JSON.stringify(err.response?.data?.details || {});
-        } catch (e) { detailMsg = 'unparseable'; }
-        
-        setError(`Permission denied. Details: ${detailMsg}. You may need to re-authenticate.`);
-      } else {
-        setError(err.response?.data?.message || 'Failed to save to Spotify.');
+          await addTrackToPlaylist(newPlaylist._id, {
+            trackId: track.id,
+            name: track.name,
+            artist: (track.artists || []).map(a => a.name).join(', '),
+            album: track.album?.name || '',
+            imageUrl: track.album?.images?.[0]?.url || track.album?.images?.[1]?.url || '',
+            previewUrl: track.preview_url || '',
+            uri: track.uri || ''
+          });
+        } catch {
+          // Skip tracks that fail to add (e.g. duplicates)
+        }
       }
+      
+      setSaved(true);
+      
+      // Notify parent to refresh sidebar playlists
+      if (onPlaylistSaved) onPlaylistSaved();
+      
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save playlist.');
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleShuffle = () => {
-    if (!generatedData) return;
-    const shuffled = [...generatedData.tracks].sort(() => Math.random() - 0.5);
-    setGeneratedData({ ...generatedData, tracks: shuffled });
   };
 
   return (
@@ -219,12 +282,19 @@ export default function AiPlaylistModal({ onClose, isSpotifyAuthed }) {
             
             <div className="ai-tracklist">
               {generatedData.tracks.map((track, i) => (
-                <div key={i} className="ai-track-item">
+                <div key={`${track.id}-${i}`} className="ai-track-item">
                   <img src={track.album?.images?.[2]?.url || 'https://via.placeholder.com/40'} alt="cover" />
                   <div className="ai-track-info">
                     <strong>{track.name}</strong>
                     <small>{track.artists.map(a => a.name).join(', ')}</small>
                   </div>
+                  <button 
+                    className="ai-track-remove" 
+                    onClick={() => handleRemoveTrack(i)}
+                    title="Remove this track"
+                  >
+                    ✕
+                  </button>
                 </div>
               ))}
             </div>
@@ -235,21 +305,17 @@ export default function AiPlaylistModal({ onClose, isSpotifyAuthed }) {
                   Expand Search (Ignore Year)
                 </button>
               )}
-              <button className="secondary" onClick={handleShuffle}>Shuffle</button>
+              <button className="secondary" onClick={handleShuffle} disabled={loading}>
+                {loading ? 'Refreshing...' : '🔀 Shuffle & Refresh'}
+              </button>
               <button className="secondary" onClick={() => setStep('input')}>Edit Details</button>
               
-              {!savedUrl ? (
-                error && error.includes('Permission denied') ? (
-                  <button className="primary-btn" onClick={() => window.location.href = `http://localhost:5000/api/spotify/login?t=${Date.now()}`}>
-                    Re-Authenticate Spotify
-                  </button>
-                ) : (
-                  <button className="primary-btn" onClick={handleSave} disabled={saving}>
-                    {saving ? 'Saving...' : 'Save to Spotify'}
-                  </button>
-                )
+              {!saved ? (
+                <button className="primary-btn" onClick={handleSaveToLocalPlaylist} disabled={saving || !currentUser}>
+                  {saving ? 'Saving...' : !currentUser ? 'Login to Save' : 'Save to My Playlists'}
+                </button>
               ) : (
-                <a href={savedUrl} target="_blank" rel="noreferrer" className="btn-link">Open in Spotify</a>
+                <span className="saved-label">✅ Saved to Your Playlists!</span>
               )}
             </div>
           </div>

@@ -798,7 +798,15 @@ export default function App() {
       {showAiPlaylist && (
         <AiPlaylistModal 
           onClose={() => setShowAiPlaylist(false)} 
-          isSpotifyAuthed={isSpotifyAuthed} 
+          isSpotifyAuthed={isSpotifyAuthed}
+          currentUser={currentUser}
+          onPlaylistSaved={() => {
+            // Refresh sidebar playlists after AI playlist is saved
+            if (!currentUser) return;
+            fetchUserPlaylists(currentUser._id || currentUser.id)
+              .then(setPlaylists)
+              .catch(() => {});
+          }}
         />
       )}
     </div>
