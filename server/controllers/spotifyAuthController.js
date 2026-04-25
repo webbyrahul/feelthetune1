@@ -28,7 +28,6 @@ export const spotifyLogin = (_req, res) => {
   authUrl.searchParams.set('scope', scopes);
   authUrl.searchParams.set('redirect_uri', redirectUri());
   authUrl.searchParams.set('show_dialog', 'true');
-
   return res.redirect(authUrl.toString());
 };
 
@@ -55,7 +54,8 @@ export const spotifyCallback = async (req, res, next) => {
     setSpotifyTokens({
       accessToken: tokenResponse.data.access_token,
       refreshToken: tokenResponse.data.refresh_token,
-      expiresIn: tokenResponse.data.expires_in
+      expiresIn: tokenResponse.data.expires_in,
+      scope: tokenResponse.data.scope // Pass the scope to the store
     });
 
     const frontendUrl = process.env.CLIENT_URL || 'http://localhost:5173';
@@ -88,7 +88,8 @@ export const refreshSpotifyToken = async () => {
   setSpotifyTokens({
     accessToken: tokenResponse.data.access_token,
     refreshToken: tokenResponse.data.refresh_token || tokens.refreshToken,
-    expiresIn: tokenResponse.data.expires_in
+    expiresIn: tokenResponse.data.expires_in,
+    scope: tokenResponse.data.scope || tokens.scope
   });
 
   return getSpotifyTokens().accessToken;
