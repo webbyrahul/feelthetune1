@@ -6,6 +6,7 @@ import Footer from './components/Footer';
 import AuthModal from './components/AuthModal';
 import CreatePlaylistModal from './components/CreatePlaylistModal';
 import AddToPlaylistModal from './components/AddToPlaylistModal';
+import AiPlaylistModal from './components/AiPlaylistModal';
 import useSpotifyWebPlayback from './hooks/useSpotifyWebPlayback';
 import {
   fetchRecommendations,
@@ -57,6 +58,9 @@ export default function App() {
   // Recently played
   const [recentlyPlayed, setRecentlyPlayed] = useState([]);
   const [showAllRecent, setShowAllRecent] = useState(false);
+
+  // AI Playlist
+  const [showAiPlaylist, setShowAiPlaylist] = useState(false);
 
   const refreshSpotifyToken = async () => {
     const tokenResponse = await fetchSpotifyAccessToken();
@@ -435,6 +439,7 @@ export default function App() {
         onLogin={() => setAuthMode('login')}
         onLogout={handleLogout}
         currentUser={currentUser}
+        onOpenAiPlaylist={() => setShowAiPlaylist(true)}
       />
 
       <main className="dashboard layout-shell">
@@ -787,6 +792,13 @@ export default function App() {
               })
               .catch(() => {});
           }}
+        />
+      )}
+
+      {showAiPlaylist && (
+        <AiPlaylistModal 
+          onClose={() => setShowAiPlaylist(false)} 
+          isSpotifyAuthed={isSpotifyAuthed} 
         />
       )}
     </div>

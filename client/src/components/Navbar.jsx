@@ -1,4 +1,4 @@
-export default function Navbar({ query, onQueryChange, onSearch, onSignup, onLogin, onLogout, currentUser }) {
+export default function Navbar({ query, onQueryChange, onSearch, onSignup, onLogin, onLogout, currentUser, onOpenAiPlaylist }) {
   return (
     <nav className="navbar">
       <h1 className="logo">FeelTheTune</h1>
@@ -12,6 +12,9 @@ export default function Navbar({ query, onQueryChange, onSearch, onSignup, onLog
         <button onClick={onSearch}>Search</button>
       </div>
       <div className="auth-actions">
+        <button className="ai-playlist-btn" onClick={onOpenAiPlaylist}>
+          ✨ AI Playlist
+        </button>
         {currentUser ? (
           <>
             <span className="welcome">Hi, {currentUser.name}</span>

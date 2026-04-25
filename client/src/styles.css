@@ -1146,3 +1146,183 @@ button.secondary {
     transform: translateY(0);
   }
 }
+
+/* AI Playlist Styles */
+.ai-playlist-btn {
+  background: linear-gradient(135deg, #ff007f, #8a2be2);
+  margin-right: 0.5rem;
+}
+.ai-playlist-btn:hover {
+  box-shadow: 0 0 15px rgba(255, 0, 127, 0.5);
+}
+
+.ai-playlist-modal {
+  width: 90%;
+  max-width: 550px;
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+}
+.form-row .form-group {
+  flex: 1;
+}
+
+.ai-results-header {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+.ai-results-header h3 {
+  margin: 0 0 0.2rem 0;
+  font-size: 1.4rem;
+  background: linear-gradient(135deg, #00c9ff, #8a2be2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.ai-results-header p {
+  margin: 0;
+  color: #b3b3b3;
+}
+
+.ai-tracklist {
+  max-height: 350px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding-right: 0.5rem;
+}
+.ai-track-item {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+.ai-track-item img {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+.ai-track-info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ai-track-info strong {
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ai-track-info small {
+  color: #b3b3b3;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ai-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.btn-link {
+  display: inline-block;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #1db954, #1ed760);
+  color: #fff;
+  padding: 0.62rem 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  text-align: center;
+}
+.btn-link:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 15px rgba(29, 185, 84, 0.5);
+}
+
+/* Prompt UI Additions */
+.prompt-group {
+  margin-bottom: 0.5rem;
+}
+
+.ai-prompt-input {
+  width: 100%;
+  padding: 1rem;
+  font-size: 1.1rem;
+  line-height: 1.5;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  resize: none;
+  transition: all 0.3s ease;
+  font-family: inherit;
+}
+
+.ai-prompt-input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #c084fc;
+  box-shadow: 0 0 15px rgba(192, 132, 252, 0.2);
+}
+
+.ai-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.ai-suggestion-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  color: #b3b3b3;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ai-suggestion-chip:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border-color: #c084fc;
+}
+
+.advanced-toggle {
+  text-align: center;
+  font-size: 0.85rem;
+  color: #b3b3b3;
+  cursor: pointer;
+  margin: 1rem 0;
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+.advanced-toggle:hover {
+  color: #c084fc;
+}
+
+.advanced-filters {
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  margin-bottom: 1rem;
+}
+
+.generate-btn {
+  width: 100%;
+  padding: 1rem;
+  font-size: 1.1rem;
+  margin-top: 1rem;
+}

@@ -98,4 +98,14 @@ export const fetchRecentlyPlayed = async () => {
   return response.data.tracks || [];
 };
 
-export const getSpotifyLoginUrl = () => `${API_BASE_URL}/spotify/login`;
+export const getSpotifyLoginUrl = () => `${API_BASE_URL}/spotify/login?t=${Date.now()}`;
+
+export const generateAiPlaylist = async (payload) => {
+  const response = await api.post('/music/generate-playlist', payload);
+  return response.data;
+};
+
+export const saveToSpotifyPlaylist = async (payload) => {
+  const response = await api.post('/music/save-to-spotify', payload);
+  return response.data;
+};
