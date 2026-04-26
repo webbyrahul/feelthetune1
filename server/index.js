@@ -8,6 +8,7 @@ import playlistRoutes from './routes/playlistRoutes.js';
 import likeRoutes from './routes/likeRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import spotifyAuthRoutes from './routes/spotifyAuthRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
 
 dotenv.config();
 
@@ -29,6 +30,7 @@ app.use('/api/playlists', playlistRoutes);
 app.use('/api/likes', likeRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/spotify', spotifyAuthRoutes);
+app.use('/api/payment', paymentRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);

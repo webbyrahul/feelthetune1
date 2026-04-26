@@ -30,7 +30,7 @@ export const signup = async (req, res, next) => {
 
     res.status(201).json({
       token,
-      user: { id: user._id, name: user.name, email: user.email }
+      user: { id: user._id, name: user.name, email: user.email, isPremium: user.isPremium }
     });
   } catch (error) {
     next(error);
@@ -55,7 +55,25 @@ export const login = async (req, res, next) => {
     }
 
     const token = signToken(user);
-    res.json({ token, user: { id: user._id, name: user.name, email: user.email } });
+    res.json({ token, user: { id: user._id, name: user.name, email: user.email, isPremium: user.isPremium } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const upgradeToPremium = async (req, res, next) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ message: 'userId is required' });
+    }
+
+    const user = await User.findByIdAndUpdate(userId, { isPremium: true }, { new: true });
+    if (!user) {
+      return res.status(404).json({ message: 'user not found' });
+    }
+
+    res.json({ user: { id: user._id, name: user.name, email: user.email, isPremium: user.isPremium } });
   } catch (error) {
     next(error);
   }
