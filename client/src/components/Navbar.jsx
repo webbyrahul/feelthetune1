@@ -1,4 +1,6 @@
-export default function Navbar({ query, onQueryChange, onSearch, onSignup, onLogin, onLogout, currentUser, onOpenAiPlaylist }) {
+import PremiumBadge from './PremiumBadge';
+
+export default function Navbar({ query, onQueryChange, onSearch, onSignup, onLogin, onLogout, currentUser, onOpenAiPlaylist, isPremium, onGetPremium }) {
   return (
     <nav className="navbar">
       <h1 className="logo">FeelTheTune</h1>
@@ -17,7 +19,13 @@ export default function Navbar({ query, onQueryChange, onSearch, onSignup, onLog
         </button>
         {currentUser ? (
           <>
+            {isPremium && <PremiumBadge />}
             <span className="welcome">Hi, {currentUser.name}</span>
+            {!isPremium && (
+              <button className="get-premium-btn" onClick={onGetPremium} id="get-premium-nav-btn">
+                ✨ Get Premium
+              </button>
+            )}
             <button className="secondary" onClick={onLogout}>
               Logout
             </button>

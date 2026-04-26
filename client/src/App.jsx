@@ -7,6 +7,10 @@ import AuthModal from './components/AuthModal';
 import CreatePlaylistModal from './components/CreatePlaylistModal';
 import AddToPlaylistModal from './components/AddToPlaylistModal';
 import AiPlaylistModal from './components/AiPlaylistModal';
+import BannerAd from './components/BannerAd';
+import PopupAd from './components/PopupAd';
+import PremiumUpsell from './components/PremiumUpsell';
+import PremiumPage from './components/PremiumPage';
 import useSpotifyWebPlayback from './hooks/useSpotifyWebPlayback';
 import {
   fetchRecommendations,
@@ -22,7 +26,8 @@ import {
   fetchUserPlaylists,
   removeTrackFromPlaylist as apiRemoveTrack,
   deletePlaylist as apiDeletePlaylist,
-  fetchRecentlyPlayed
+  fetchRecentlyPlayed,
+  upgradeToPremium
 } from './services/api';
 
 export default function App() {
@@ -62,6 +67,12 @@ export default function App() {
 
   // AI Playlist
   const [showAiPlaylist, setShowAiPlaylist] = useState(false);
+
+  // Premium & Ads
+  const isPremium = currentUser?.isPremium || false;
+  const [showPopupAd, setShowPopupAd] = useState(false);
+  const [premiumToast, setPremiumToast] = useState(false);
+  const [showPremiumPage, setShowPremiumPage] = useState(false);
 
   const refreshSpotifyToken = async () => {
     const tokenResponse = await fetchSpotifyAccessToken();
@@ -183,6 +194,10 @@ export default function App() {
       localStorage.setItem('ftt_user', JSON.stringify(data.user));
       setCurrentUser(data.user);
       setAuthMode(null);
+      // Trigger popup ad after login for free users
+      if (!data.user.isPremium) {
+        setTimeout(() => setShowPopupAd(true), 2000);
+      }
     } catch (authErr) {
       setAuthError(authErr.response?.data?.message || 'Authentication failed');
     } finally {
@@ -196,6 +211,31 @@ export default function App() {
     setCurrentUser(null);
     setAuthMode('login');
   };
+
+  // Upgrade to Premium
+  const handleUpgradePremium = async () => {
+    if (!currentUser) {
+      setAuthMode('login');
+      return;
+    }
+    try {
+      const data = await upgradeToPremium(currentUser._id || currentUser.id);
+      const updatedUser = data.user;
+      localStorage.setItem('ftt_user', JSON.stringify(updatedUser));
+      setCurrentUser(updatedUser);
+      setPremiumToast(true);
+      setTimeout(() => setPremiumToast(false), 4000);
+    } catch {
+      setError('Failed to upgrade. Please try again.');
+    }
+  };
+
+  // Popup ad timer — show after 5 minutes for free users
+  useEffect(() => {
+    if (isPremium) return;
+    const timer = setTimeout(() => setShowPopupAd(true), 5 * 60 * 1000);
+    return () => clearTimeout(timer);
+  }, [isPremium]);
 
   const topAlbums = useMemo(() => (results?.albums?.items || albums).slice(0, 20), [results, albums]);
 
@@ -482,6 +522,8 @@ export default function App() {
         onLogout={handleLogout}
         currentUser={currentUser}
         onOpenAiPlaylist={() => setShowAiPlaylist(true)}
+        isPremium={isPremium}
+        onGetPremium={() => setShowPremiumPage(true)}
       />
 
       <main className="dashboard layout-shell">
@@ -606,6 +648,10 @@ export default function App() {
               <p className="sidebar-recent-empty">No playlists yet. Create one!</p>
             )}
           </div>
+
+          {/* Sidebar Premium Upsell & Ad */}
+          <PremiumUpsell isPremium={isPremium} onUpgrade={() => setShowPremiumPage(true)} />
+          <BannerAd isPremium={isPremium} variant="sidebar" onUpgrade={() => setShowPremiumPage(true)} />
         </aside>
 
         <section className="main-panel">
@@ -643,6 +689,8 @@ export default function App() {
           </section>
         )}
 
+        <BannerAd isPremium={isPremium} variant="main" seed={1} />
+
         <section>
           <h3>Albums</h3>
           <HorizontalScroller>
@@ -658,6 +706,8 @@ export default function App() {
           </HorizontalScroller>
         </section>
 
+        <BannerAd isPremium={isPremium} variant="main" seed={2} />
+
         <section>
           <h3>Artists</h3>
           <HorizontalScroller>
@@ -672,6 +722,8 @@ export default function App() {
             ))}
           </HorizontalScroller>
         </section>
+
+        <BannerAd isPremium={isPremium} variant="main" seed={3} />
 
         {selectedView && (
         <div className="details-overlay" id="details-overlay">
@@ -816,6 +868,25 @@ export default function App() {
           </section>
         </div>
       )}
+
+      {showPremiumPage && (
+        <div className="details-overlay" id="premium-page-overlay">
+          <div className="details-overlay-backdrop" />
+          <section className="details-panel">
+            <PremiumPage
+              onBack={() => setShowPremiumPage(false)}
+              currentUser={currentUser}
+              onPaymentSuccess={(updatedUser) => {
+                localStorage.setItem('ftt_user', JSON.stringify(updatedUser));
+                setCurrentUser(updatedUser);
+                setShowPremiumPage(false);
+                setPremiumToast(true);
+                setTimeout(() => setPremiumToast(false), 4000);
+              }}
+            />
+          </section>
+        </div>
+      )}
         </section>
       </main>
 
@@ -915,6 +986,14 @@ export default function App() {
               .catch(() => {});
           }}
         />
+      )}
+
+      <PopupAd isPremium={isPremium} show={showPopupAd} onClose={() => setShowPopupAd(false)} />
+
+      {premiumToast && (
+        <div className="premium-toast" id="premium-toast">
+          <span>🎉</span> Ad-free listening enabled! Welcome to Premium.
+        </div>
       )}
     </div>
   );

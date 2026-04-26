@@ -109,3 +109,23 @@ export const saveToSpotifyPlaylist = async (payload) => {
   const response = await api.post('/music/save-to-spotify', payload);
   return response.data;
 };
+
+export const upgradeToPremium = async (userId) => {
+  const response = await api.post('/auth/upgrade-premium', { userId });
+  return response.data;
+};
+
+export const getRazorpayKey = async () => {
+  const response = await api.get('/payment/key');
+  return response.data;
+};
+
+export const createPaymentOrder = async (payload) => {
+  const response = await api.post('/payment/create-order', payload);
+  return response.data;
+};
+
+export const verifyPayment = async (payload) => {
+  const response = await api.post('/payment/verify', payload);
+  return response.data;
+};
