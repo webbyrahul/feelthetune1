@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Navbar from './components/Navbar';
 import MediaCard from './components/MediaCard';
 import HorizontalScroller from './components/HorizontalScroller';
@@ -44,6 +44,7 @@ export default function App() {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [currentQueue, setCurrentQueue] = useState([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(-1);
+  const [dominantColor, setDominantColor] = useState('138, 43, 226');
   const [pendingTrackIndex, setPendingTrackIndex] = useState(null);
   const [requestedTrack, setRequestedTrack] = useState(null);
   const [spotifyToken, setSpotifyToken] = useState('');
@@ -286,7 +287,8 @@ export default function App() {
     try {
       setDetailsLoading(true);
       setActivePlaylistId(null);
-      setSelectedView({ type: 'album', id: album.id, title: album.name });
+      const coverImage = album.images?.[0]?.url || album.images?.[1]?.url || '';
+      setSelectedView({ type: 'album', id: album.id, title: album.name, image: coverImage, subtitle: (album.artists || []).map((a) => a.name).join(', ') });
       const data = await fetchAlbumTracks(album.id);
       setSelectedTracks(data.tracks || []);
       setCurrentQueue(data.tracks || []);
@@ -303,7 +305,8 @@ export default function App() {
     try {
       setDetailsLoading(true);
       setActivePlaylistId(null);
-      setSelectedView({ type: 'artist', id: artist.id, title: artist.name });
+      const coverImage = artist.images?.[0]?.url || artist.images?.[1]?.url || '';
+      setSelectedView({ type: 'artist', id: artist.id, title: artist.name, image: coverImage, subtitle: `${artist.followers?.total?.toLocaleString() || 0} followers` });
       const tracks = await fetchArtistTopTracks(artist.id, artist.name);
       const topTracks = tracks.slice(0, 10);
       setSelectedTracks(topTracks);
@@ -320,7 +323,8 @@ export default function App() {
   // Playlist handlers
   const openPlaylistDetails = (playlist) => {
     setActivePlaylistId(playlist._id);
-    setSelectedView({ type: 'playlist', id: playlist._id, title: playlist.name });
+    const firstTrackImg = playlist.tracks?.[0]?.imageUrl || '';
+    setSelectedView({ type: 'playlist', id: playlist._id, title: playlist.name, image: firstTrackImg, subtitle: `${playlist.tracks?.length || 0} songs` });
     // Convert stored tracks to a playable format
     const tracks = (playlist.tracks || []).map((t) => ({
       id: t.trackId,
@@ -428,6 +432,44 @@ export default function App() {
     startPlaybackAtIndex(pendingTrackIndex);
     setPendingTrackIndex(null);
   }, [deviceId, pendingTrackIndex]);
+
+  // Extract dominant color from the cover image for dynamic gradient
+  useEffect(() => {
+    if (!selectedView?.image) {
+      setDominantColor('138, 43, 226');
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 50;
+        canvas.height = 50;
+        ctx.drawImage(img, 0, 0, 50, 50);
+        const data = ctx.getImageData(0, 0, 50, 50).data;
+        let r = 0, g = 0, b = 0, count = 0;
+        for (let i = 0; i < data.length; i += 16) {
+          // Skip very dark / very bright pixels for a richer color
+          const pr = data[i], pg = data[i + 1], pb = data[i + 2];
+          const brightness = pr * 0.299 + pg * 0.587 + pb * 0.114;
+          if (brightness > 30 && brightness < 220) {
+            r += pr; g += pg; b += pb; count++;
+          }
+        }
+        if (count > 0) {
+          setDominantColor(`${Math.round(r / count)}, ${Math.round(g / count)}, ${Math.round(b / count)}`);
+        } else {
+          setDominantColor('138, 43, 226');
+        }
+      } catch {
+        setDominantColor('138, 43, 226');
+      }
+    };
+    img.onerror = () => setDominantColor('138, 43, 226');
+    img.src = selectedView.image;
+  }, [selectedView?.image]);
 
   return (
     <div className="app-shell">
@@ -632,16 +674,68 @@ export default function App() {
         </section>
 
         {selectedView && (
+        <div className="details-overlay" id="details-overlay">
+          <div className="details-overlay-backdrop" />
           <section className="details-panel">
-            <div className="details-panel-header">
-              <h3>
-                {selectedView.type === 'album'
-                  ? 'Album Songs'
-                  : selectedView.type === 'artist'
-                  ? 'Artist Top Songs'
-                  : 'Playlist'}{' '}
-                · {selectedView.title}
-              </h3>
+            {/* Hero Header */}
+            <div
+              className="details-hero"
+              style={{ background: `linear-gradient(180deg, rgba(${dominantColor}, 0.85) 0%, rgba(${dominantColor}, 0.35) 60%, transparent 100%)` }}
+            >
+              <button
+                className="details-back-btn"
+                onClick={() => setSelectedView(null)}
+                id="details-back-btn"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+                Back
+              </button>
+              <div className="details-hero-content">
+                {selectedView.image ? (
+                  <img
+                    className="details-hero-cover"
+                    src={selectedView.image}
+                    alt={selectedView.title}
+                  />
+                ) : (
+                  <div className="details-hero-cover details-hero-cover-placeholder">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M9 18V5l12-2v13" />
+                      <circle cx="6" cy="18" r="3" />
+                      <circle cx="18" cy="16" r="3" />
+                    </svg>
+                  </div>
+                )}
+                <div className="details-hero-info">
+                  <span className="details-hero-type">
+                    {selectedView.type === 'album' ? 'Album' : selectedView.type === 'artist' ? 'Artist' : 'Playlist'}
+                  </span>
+                  <h1 className="details-hero-title">{selectedView.title}</h1>
+                  {selectedView.subtitle && (
+                    <p className="details-hero-subtitle">{selectedView.subtitle}</p>
+                  )}
+                  <p className="details-hero-meta">
+                    {selectedTracks.length} {selectedTracks.length === 1 ? 'song' : 'songs'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions row */}
+            <div className="details-actions-row">
+              {selectedTracks.length > 0 && (
+                <button
+                  className="details-play-btn"
+                  onClick={() => playTrackAtIndex(0)}
+                  title="Play all"
+                >
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
+                </button>
+              )}
               {selectedView.type === 'playlist' && (
                 <button
                   className="add-songs-btn"
@@ -656,12 +750,15 @@ export default function App() {
                 </button>
               )}
             </div>
+
+            {/* Track list */}
             {detailsLoading ? (
               <p>Loading songs...</p>
             ) : selectedTracks.length ? (
               <div className="track-table">
                 <div className="track-head">
                   <span>#</span>
+                  <span></span>
                   <span>Song</span>
                   <span>{selectedView.type === 'playlist' ? '' : 'Duration'}</span>
                 </div>
@@ -673,6 +770,15 @@ export default function App() {
                       className={!track.uri ? 'track-disabled' : ''}
                     >
                       <span className="track-index">{index + 1}</span>
+                      <img
+                        className="track-thumb"
+                        src={
+                          track.album?.images?.[2]?.url ||
+                          track.album?.images?.[0]?.url ||
+                          'https://via.placeholder.com/44'
+                        }
+                        alt={track.name}
+                      />
                       <div className="track-meta">
                         <span>{track.name}</span>
                         <small>{(track.artists || []).map((artist) => artist.name).join(', ')}</small>
@@ -708,7 +814,8 @@ export default function App() {
               <p>No songs found for this selection.</p>
             )}
           </section>
-        )}
+        </div>
+      )}
         </section>
       </main>
 
